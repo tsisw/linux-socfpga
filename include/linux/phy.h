@@ -570,6 +570,7 @@ struct macsec_ops;
  * @loopback_enabled: Set true if this PHY has been loopbacked successfully.
  * @downshifted_rate: Set true if link speed has been downshifted.
  * @is_on_sfp_module: Set true if PHY is located on an SFP module.
+ * @is_on_qsfp_module: Set true if PHY is located on an QSFP module.
  * @mac_managed_pm: Set true if MAC driver takes of suspending/resuming PHY
  * @wol_enabled: Set to true if the PHY or the attached MAC have Wake-on-LAN
  * 		 enabled.
@@ -674,6 +675,7 @@ struct phy_device {
 	unsigned loopback_enabled:1;
 	unsigned downshifted_rate:1;
 	unsigned is_on_sfp_module:1;
+	unsigned is_on_qsfp_module:1;
 	unsigned mac_managed_pm:1;
 	unsigned wol_enabled:1;
 
@@ -1693,6 +1695,15 @@ static inline bool phy_is_internal(struct phy_device *phydev)
 static inline bool phy_on_sfp(struct phy_device *phydev)
 {
 	return phydev->is_on_sfp_module;
+}
+
+/**
+ * phy_on_qsfp - Convenience function for testing if a PHY is on an QSFP moduleAdd commentMore actions
+ * @phydev: the phy_device struct
+ */
+static inline bool phy_on_qsfp(struct phy_device *phydev)
+{
+	return phydev->is_on_qsfp_module;
 }
 
 /**
