@@ -761,7 +761,6 @@ static void altera_pcie_retrain(struct altera_pcie *pcie)
 	 */
 	altera_read_cap_word(pcie, pcie->root_bus_nr, RP_DEVFN, PCI_EXP_LNKCAP,
 			     &linkcap);
-	printk("MM: In pcie retrain() linkstat %hu  PCIE Current Link speed %x\n",linkstat,PCI_EXP_LNKSTA_CLS); ;
 
 	if ((linkcap & PCI_EXP_LNKCAP_SLS) <= PCI_EXP_LNKCAP_SLS_2_5GB)
 		return;
@@ -1021,13 +1020,11 @@ static int altera_pcie_probe(struct platform_device *pdev)
 		cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
 		/* enable all interrupts */
 		cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
-		dev_err(dev, "MM: Comes here if ALTERA_PCIE_V1 or V2 \n");
 		altera_pcie_host_init(pcie);
 	} else if (pcie->pcie_data->version == ALTERA_PCIE_V3) {
 		writel(CFG_AER,
 		       pcie->hip_base + pcie->pcie_data->port_conf_offset +
 		       pcie->pcie_data->port_irq_enable_offset);
-               dev_err(dev, "MM: Comes here if ALTERA_PCIE_V3 \n");
 	}
 
 	bridge->sysdata = pcie;
