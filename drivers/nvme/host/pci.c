@@ -1029,6 +1029,7 @@ static inline void nvme_handle_cqe(struct nvme_queue *nvmeq,
 	}
 
 	req = nvme_find_rq(nvme_queue_tagset(nvmeq), command_id);
+	pr_err("MM : In nvme_handle_cqe() : command id %hu \n", command_id);
 	if (unlikely(!req)) {
 		dev_warn(nvmeq->dev->ctrl.device,
 			"invalid id %d completed on queue %d\n",
@@ -2270,6 +2271,9 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	dev->nr_poll_queues = poll_queues;
 
 	nr_io_queues = dev->nr_allocated_queues - 1;
+	printk("MM: nr_io_queues - %u , dev->nr_allocated_queues %u \n", nr_io_queues, dev->nr_allocated_queues);
+	nr_io_queues = 4;
+	printk("MM: nr_io_queues - %d \n", nr_io_queues);
 	result = nvme_set_queue_count(&dev->ctrl, &nr_io_queues);
 	if (result < 0)
 		return result;

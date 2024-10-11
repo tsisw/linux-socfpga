@@ -2317,10 +2317,12 @@ int nvme_enable_ctrl(struct nvme_ctrl *ctrl)
 
 	ctrl->ctrl_config |= NVME_CC_ENABLE;
 	ret = ctrl->ops->reg_write32(ctrl, NVME_REG_CC, ctrl->ctrl_config);
+	dev_info(ctrl->device, "MM: PATCH nvme_wait_ready now wait for %u,previously %u\n",(timeout + 1) * 2, (timeout + 1)/2);
 	if (ret)
 		return ret;
 	return nvme_wait_ready(ctrl, NVME_CSTS_RDY, NVME_CSTS_RDY,
-			       (timeout + 1) / 2, "initialisation");
+			       (timeout + 1) * 2, "initialisation");
+/*MM : PATCH                          (timeout + 1) / 2, "initialisation"); */
 }
 EXPORT_SYMBOL_GPL(nvme_enable_ctrl);
 
