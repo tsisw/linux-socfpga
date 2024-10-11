@@ -761,7 +761,6 @@ static void altera_pcie_retrain(struct altera_pcie *pcie)
 	 */
 	altera_read_cap_word(pcie, pcie->root_bus_nr, RP_DEVFN, PCI_EXP_LNKCAP,
 			     &linkcap);
-
 	if ((linkcap & PCI_EXP_LNKCAP_SLS) <= PCI_EXP_LNKCAP_SLS_2_5GB)
 		return;
 
