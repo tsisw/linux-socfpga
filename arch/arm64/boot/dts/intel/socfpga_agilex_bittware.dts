@@ -181,14 +181,8 @@
 	};
 };
 
-/* To test TXE blob with DDR, we need to comment out PCIE & SSD */
-#ifdef DDR_ACCESS
 &pcie_0_pcie_aglx {
 	status = "okay";
 	compatible = "altr,pcie-root-port-3.0-f-tile";
-	/* interrupts = <0 0 0>; */
-/*	interrupts = <32 IRQ_TYPE_LEVEL_HIGH>;
-	interupt_parent = <&intc>; */
 };
-#endif
 
