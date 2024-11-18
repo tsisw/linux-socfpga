@@ -25,11 +25,16 @@
 			alignment = <0x1000>;
 			no-map;
 		};
-                service_reserved1: svcbuffer@1 {
+               service_reserved1: svcbuffer@1 {
                         compatible = "shared-dma-pool";
+			reusable;
                         reg = <0x0 0x56A00000 0x0 0x20000000>;
                         alignment = <0x1000>;
-                        no-map;
+                };
+                service_reserved2: svcbuffer@2 {
+                        compatible = "shared-dma-pool";
+                        reg = <0x20 0x80000000 0x0 0x80000000>;
+                        alignment = <0x1000>;
                 };
 	};
 
