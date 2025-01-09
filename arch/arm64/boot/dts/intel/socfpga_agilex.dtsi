@@ -25,6 +25,31 @@
 			alignment = <0x1000>;
 			no-map;
 		};
+		service_reserved1: svcbuffer@1 {
+			compatible = "shared-dma-pool";
+  			reusable;
+			reg = <0x0 0x56A00000 0x0 0x20000000>;
+			alignment = <0x1000>;
+		};
+		service_reserved2: svcbuffer@2 {
+			compatible = "shared-dma-pool";
+			no-map-fixup;
+			reg = <0x20 0x80000000 0x0 0x80000000>;
+			alignment = <0x1000>;
+		};
+	};
+	udmabuf@0 {
+		compatible = "ikwzm,u-dma-buf";
+		device-name = "udmabuf0";
+		size = <0x20000000>; // 512MiB
+		memory-region = <&service_reserved1>;
+	};
+
+	udmabuf@1 {
+		compatible = "ikwzm,u-dma-buf";
+		device-name = "udmabuf1";
+		size = <0x80000000>; // 2GiB
+		memory-region = <&service_reserved2>;
 	};
 
 	cpus {
