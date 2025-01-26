@@ -23,13 +23,13 @@
 			compatible = "shared-dma-pool";
 			reg = <0x0 0x0 0x0 0x2000000>;
 			alignment = <0x1000>;
-			/*no-map;*/
-			reusable;
+			no-map;
+			/*reusable;*/
 		};
 		service_reserved1: svcbuffer@1 {
 			compatible = "shared-dma-pool";
   			reusable;
-			reg = <0x0 0x3EA00000 0x0 0x40000000>;
+			reg = <0x0 0x40000000 0x0 0x40000000>;
 			alignment = <0x1000>;
 		};
 		service_reserved2: svcbuffer@2 {
