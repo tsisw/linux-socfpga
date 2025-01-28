@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2019, Intel Corporation
  */
-#include "socfpga_agilex.dtsi"
+#include "socfpga_agilex_bittware.dtsi"
 #include "socfpga_agilex_pcie_root_port.dtsi"
 / {
 	model = "SoCFPGA Agilex BittWare";
