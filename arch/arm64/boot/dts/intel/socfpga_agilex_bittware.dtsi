@@ -41,7 +41,7 @@
 	udmabuf@0 {
 		compatible = "ikwzm,u-dma-buf";
 		device-name = "udmabuf0";
-		size = <0x38000000>; // 896 MiB
+		size = <0x3C000000>; // 896 MiB
 		memory-region = <&service_reserved1>;
 	};
 
