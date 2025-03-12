@@ -769,19 +769,22 @@ static int udp_tunnel_nic_register(struct net_device *dev)
 	struct udp_tunnel_nic_shared_node *node = NULL;
 	struct udp_tunnel_nic *utn;
 	unsigned int n_tables, i;
-
+	netdev_WARN(dev, "LINE: %d", __LINE__);
 	BUILD_BUG_ON(sizeof(utn->missed) * BITS_PER_BYTE <
 		     UDP_TUNNEL_NIC_MAX_TABLES);
 	/* Expect use count of at most 2 (IPv4, IPv6) per device */
 	BUILD_BUG_ON(UDP_TUNNEL_NIC_USE_CNT_MAX <
 		     UDP_TUNNEL_NIC_MAX_SHARING_DEVICES * 2);
 
+	netdev_WARN(dev, "LINE: %d", __LINE__);
 	/* Check that the driver info is sane */
 	if (WARN_ON(!info->set_port != !info->unset_port) ||
 	    WARN_ON(!info->set_port == !info->sync_table) ||
 	    WARN_ON(!info->tables[0].n_entries))
+	{
+		netdev_WARN(dev, "LINE: %d", __LINE__);
 		return -EINVAL;
-
+	}
 	if (WARN_ON(info->shared &&
 		    info->flags & UDP_TUNNEL_NIC_INFO_OPEN_ONLY))
 		return -EINVAL;
