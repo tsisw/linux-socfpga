@@ -40,32 +40,10 @@
 #include <linux/net_tstamp.h>
 #include <net/rtnetlink.h>
 #include <linux/u64_stats_sync.h>
-#include <net/vxlan.h>
 
 #define DRV_NAME	"dummy"
 
 static int numdummies = 1;
-static int dummy_vxlan_set_port(struct net_device *netdev, unsigned int table,
-				unsigned int entry, struct udp_tunnel_info *ti)
-{
-	return 0;
-}
-
-static int dummy_vxlan_unset_port(struct net_device *netdev, unsigned int table,
-				  unsigned int entry, struct udp_tunnel_info *ti)
-{
-	return 0;
-}
-
-static const struct udp_tunnel_nic_info dummy_udp_tunnels = {
-	.set_port	= dummy_vxlan_set_port,
-	.unset_port	= dummy_vxlan_unset_port,
-	.flags		= UDP_TUNNEL_NIC_INFO_MAY_SLEEP |
-			  UDP_TUNNEL_NIC_INFO_OPEN_ONLY,
-	.tables		= {
-		{ .n_entries = 1, .tunnel_types = UDP_TUNNEL_TYPE_VXLAN, },
-	},
-};
 
 /* fake multicast ability */
 static void set_multicast_list(struct net_device *dev)
@@ -92,8 +70,6 @@ static int dummy_dev_init(struct net_device *dev)
 	dev->lstats = netdev_alloc_pcpu_stats(struct pcpu_lstats);
 	if (!dev->lstats)
 		return -ENOMEM;
-
-	dev->udp_tunnel_nic_info = &dummy_udp_tunnels;
 
 	netdev_lockdep_set_classes(dev);
 	return 0;
