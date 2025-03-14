@@ -1607,9 +1607,10 @@ CONFIG_BLK_DEV_NVME=y
 #CONFIG_NVME_FC=y
 CONFIG_DUMMY=m
 
-#######################
-# For Flannel
-#######################
+##########################################
+# For Flannel enable config flags
+# For NFT tables, STP, VXLAN and Wireguard
+#########################################
 CONFIG_CFS_BANDWIDTH=y
 CONFIG_NETFILTER_NETLINK=m
 CONFIG_NETFILTER_XT_MATCH_OWNER=m
