@@ -4,6 +4,8 @@
  */
 #include "socfpga_agilex_bittware.dtsi"
 #include "socfpga_agilex_pcie_root_port.dtsi"
+#include "fm87_ftile_10g_2port_ptp.dtsi"
+
 / {
 	model = "SoCFPGA Agilex BittWare";
 
@@ -48,7 +50,7 @@
 };
 
 &gmac2 {
-	status = "disabled";
+	status = "okay";
 	phy-mode = "rgmii";
 	phy-handle = <&phy0>;
 
