@@ -3341,7 +3341,7 @@ void *stratix10_svc_allocate_memory(struct stratix10_svc_chan *chan,
 	struct iova *alloc;
 	dma_addr_t dma_addr;
 
-	pmem = devm_kzalloc(chan->ctrl->dev, sizeof(*pmem), GFP_KERNEL);
+	pmem = kzalloc(sizeof(*pmem), GFP_KERNEL);
 	if (!pmem)
 		return ERR_PTR(-ENOMEM);
 
@@ -3352,6 +3352,7 @@ void *stratix10_svc_allocate_memory(struct stratix10_svc_chan *chan,
 		va = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO | __GFP_DMA, get_order(s));
 		if (!va) {
 			pr_debug("%s get_free_pages_failes\n", __func__);
+			kfree(pmem);
 			mutex_unlock(&svc_mem_lock);
 			return ERR_PTR(-ENOMEM);
 		}
@@ -3372,6 +3373,7 @@ void *stratix10_svc_allocate_memory(struct stratix10_svc_chan *chan,
 						iova_pfn(&chan->ctrl->carveout.domain,
 									dma_addr));
 			free_pages((unsigned long)va, get_order(size));
+			kfree(pmem);
 			mutex_unlock(&svc_mem_lock);
 			return ERR_PTR(-ENOMEM);
 		}
@@ -3381,8 +3383,11 @@ void *stratix10_svc_allocate_memory(struct stratix10_svc_chan *chan,
 		s = roundup(size, 1 << genpool->min_alloc_order);
 
 		va_gen_pool = gen_pool_alloc(genpool, s);
-		if (!va_gen_pool)
+		if (!va_gen_pool) {
+			kfree(pmem);
+			mutex_unlock(&svc_mem_lock);
 			return ERR_PTR(-ENOMEM);
+		}
 
 		va = (void *)va_gen_pool;
 
@@ -3413,7 +3418,16 @@ EXPORT_SYMBOL_GPL(stratix10_svc_allocate_memory);
 void stratix10_svc_free_memory(struct stratix10_svc_chan *chan, void *kaddr)
 {
 	struct stratix10_svc_data_mem *pmem;
+
+	if (!chan || !kaddr)
+		return;
+
 	mutex_lock(&svc_mem_lock);
+
+	if (list_empty(&svc_data_mem)) {
+		mutex_unlock(&svc_mem_lock);
+		return;
+	}
 
 	list_for_each_entry(pmem, &svc_data_mem, node)
 		if (pmem->vaddr == kaddr) {
@@ -3429,11 +3443,11 @@ void stratix10_svc_free_memory(struct stratix10_svc_chan *chan, void *kaddr)
 				pmem->vaddr = NULL;
 			}
 			list_del(&pmem->node);
+			kfree(pmem);
 			mutex_unlock(&svc_mem_lock);
 			return;
 		}
 	mutex_unlock(&svc_mem_lock);
-	list_del(&svc_data_mem);
 }
 EXPORT_SYMBOL_GPL(stratix10_svc_free_memory);
 
