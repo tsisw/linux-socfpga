@@ -1138,7 +1138,7 @@ config SERIAL_ALTERA_UART_MAXPORTS
 config SERIAL_ALTERA_UART_BAUDRATE
 	int "Default baudrate for Altera UART ports"
 	depends on SERIAL_ALTERA_UART
-	default 115200
+	default 921600
 	help
 	  This setting lets you define what the default baudrate is for the
 	  Altera UART ports. The usual default varies from board to board,
