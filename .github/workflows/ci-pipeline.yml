@@ -128,7 +128,7 @@ jobs:
           cd application.devops.github.pr.workflow
           mv /tmp/coverity-result-json/* .
           rm -rf /tmp/coverity-result-json
-          bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }}
+          bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
 
       - name: linux-coverity-report
         if: always()
