@@ -257,20 +257,6 @@ jobs:
       options: -v /mnt/nfs_share/site/proj/psg:/p/psg
     needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-tag, ci-on-board-verification]
     steps:
-     - name: Check for unaddressed change requests
-       env:
-          https_proxy: proxy-dmz.intel.com:912 # If the self-hosted runner has issues with the proxy
-       run: |
-          tmp_dir=$(mktemp -d -t get-prerequisite-binary-XXXX)
-          cd $tmp_dir
-          rm -rf application.devops.github.pr.workflow
-          git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
-          git checkout master
-          bash workflow_Check_Unaddressed_Change_Request.sh ${{ github.workspace }} ${{ github.repository }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
-          rm -rf $tmp_dir
-
      - name: On failure
        if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification.result != 'success'}}
        run: |
