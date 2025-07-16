@@ -3,7 +3,7 @@
  * Copyright (c) 2025, Altera Corporation. All rights reserved.
  */
 
-#include "socfpga_agilex5_socdk_nand_b0.dts"
+#include "socfpga_agilex5_socdk_nand.dts"
 
 / {
 	model = "SoCFPGA Agilex5 SoCDK";
