@@ -40,8 +40,8 @@ jobs:
       - name: Checkpatch.pl
         run: |
           git config --global --add safe.directory /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
           git checkout master
           bash workflow_Checkpatch.sh ../ ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }} ${{ github.head_ref }} ${{ github.base_ref }}
 
@@ -58,27 +58,27 @@ jobs:
       - name : Download coverity script
         run: |
           git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
           git checkout master
 
       - name: Run Coverity Build
         run: |
-          cd application.devops.github.pr.workflow
+          cd applications.devops.build-bot.github-pr-workflow
           bash workflow_Coverity.sh ${{ github.workspace }} ${{ github.event.repository.name }} linux-socfpga-github-workflow ${{ github.head_ref }} ${{ github.base_ref }}
 
       - name: linux-coverity-prechange-report
         uses: actions/upload-artifact@v4
         with:
           name: linux-coverity-prechange-report
-          path: linux_output_defect_prechange.json
+          path: ${{ github.workspace }}/linux_output_defect_prechange.json
           retention-days: 14
 
       - name: linux-coverity-postchange-report
         uses: actions/upload-artifact@v4
         with:
           name: linux-coverity-postchange-report
-          path: linux_output_defect_postchange.json
+          path: ${{ github.workspace }}/linux_output_defect_postchange.json
           retention-days: 14
 
   ci-coverity-parse-result:
@@ -112,13 +112,13 @@ jobs:
       - name : Download coverity parser script
         run: |
           git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
           git checkout master
 
       - name : Run Coverity Parser
         run: |
-          cd application.devops.github.pr.workflow
+          cd applications.devops.build-bot.github-pr-workflow
           mv /tmp/coverity-result-json/* .
           rm -rf /tmp/coverity-result-json
           bash workflow_Coverity_Parser.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ secrets.GITHUB_TOKEN }} ${{ github.event.pull_request.number }}
@@ -129,7 +129,7 @@ jobs:
         with:
           name: linux-coverity-report
           path: |
-            linux_output_defect.csv
+            ${{ github.workspace }}/linux_output_defect.csv
           retention-days: 14
 
 #This action performs a build test using an ubuntu container.
@@ -148,8 +148,8 @@ jobs:
         run: |
           DIR=$(pwd)
           git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
           git checkout master
           bash workflow_Build.sh $DIR ${{ github.event.repository.name }} linux-socfpga-github-workflow
 
@@ -171,7 +171,7 @@ jobs:
      steps:
       - name: Cleaning workspace
         run: |
-          rm -rf application.devops.github.pr.workflow
+          rm -rf applications.devops.build-bot.github-pr-workflow
           rm -rf ${GITHUB_WORKSPACE}/.git*
 
       - name: Download linux artifacts
@@ -185,8 +185,8 @@ jobs:
 
       - name: Simics Regtest
         run: |
-          git clone https://github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
           git checkout master
           bash workflow_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
 
@@ -201,7 +201,7 @@ jobs:
     steps:
     - name: Cleaning workspace
       run: |
-        rm -rf application.devops.github.pr.workflow
+        rm -rf applications.devops.build-bot.github-pr-workflow
         rm -rf ${GITHUB_WORKSPACE}/.git*
 
     - name: Download linux artifacts
@@ -215,8 +215,8 @@ jobs:
 
     - name: On-board Regtest
       run: |
-        git clone https://github.com/intel-sandbox/application.devops.github.pr.workflow
-        cd application.devops.github.pr.workflow
+        git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+        cd applications.devops.build-bot.github-pr-workflow
         git checkout master
         bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }}
 
@@ -233,13 +233,13 @@ jobs:
       - name : Download check_tag script
         run: |
           git config --global credential.helper store
-          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
-          cd application.devops.github.pr.workflow
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
           git checkout master
 
       - name: Check_Tag
         run: |
-          cd application.devops.github.pr.workflow
+          cd applications.devops.build-bot.github-pr-workflow
           bash workflow_Check_Tag.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ github.base_ref }} ${{ secrets.GITHUB_TOKEN }}
 
 #This is the commit gate that ensures all required checks are passing before the PR is allowed to be merged.
