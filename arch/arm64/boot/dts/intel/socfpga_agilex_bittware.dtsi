@@ -191,7 +191,7 @@
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
 			clocks = <&clkmgr AGILEX_EMAC0_CLK>, <&clkmgr AGILEX_EMAC_PTP_CLK>;
 			clock-names = "stmmaceth", "ptp_ref";
-			status = "disabled";
+			status = "enabled";
 		};
 
 		gmac1: ethernet@ff802000 {
@@ -209,7 +209,7 @@
 			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
 			clocks = <&clkmgr AGILEX_EMAC1_CLK>, <&clkmgr AGILEX_EMAC_PTP_CLK>;
 			clock-names = "stmmaceth", "ptp_ref";
-			status = "disabled";
+			status = "enabled";
 		};
 
 		gmac2: ethernet@ff804000 {
