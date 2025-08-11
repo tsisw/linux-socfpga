@@ -48,7 +48,7 @@ jobs:
   ci-coverity:
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
+        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-cov-2024
     env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
       EC_DISABLE_VAL: project,system
@@ -61,13 +61,6 @@ jobs:
           git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/intel-sandbox/application.devops.github.pr.workflow
           cd application.devops.github.pr.workflow
           git checkout master
-
-      - name : Setup Coverity
-        uses: intel-innersource/frameworks.actions.setup-coverity@v1
-        env:
-          https_proxy: proxy-dmz.intel.com:912 # If the self-hosted runner has issues with the proxy
-        with:
-          version: '2022.3.1'
 
       - name: Run Coverity Build
         run: |
@@ -92,7 +85,7 @@ jobs:
     needs: ci-coverity
     runs-on: [self-hosted,pg-embedded-runner]
     container:
-        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
+        image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-cov-2024
 
     steps:
       - name: Download prechange coverity result
@@ -225,7 +218,7 @@ jobs:
         git clone https://github.com/intel-sandbox/application.devops.github.pr.workflow
         cd application.devops.github.pr.workflow
         git checkout master
-        bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
+        bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }}
 
 #This action checks if the branch has been released and if so block PR until approved by repo Admin
   ci-check-tag:
