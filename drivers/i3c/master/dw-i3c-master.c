@@ -1652,12 +1652,6 @@ int dw_i3c_common_probe(struct dw_i3c_master *master,
 	master->maxdevs = ret >> 16;
 	master->free_pos = GENMASK(master->maxdevs - 1, 0);
 
-	INIT_WORK(&master->hj_work, dw_i3c_hj_work);
-	ret = i3c_master_register(&master->base, &pdev->dev,
-				  &dw_mipi_i3c_ops, false);
-	if (ret)
-		goto err_disable_pm;
-
 	ret = device_property_read_u32(&pdev->dev, "snps,dev-nack-retry-cnt",
 		&master->dev_nack_retry_cnt);
 	if (ret) {
@@ -1667,6 +1661,12 @@ int dw_i3c_common_probe(struct dw_i3c_master *master,
 		pr_info("Setting dev_nack_retry_cnt to %d!\n", MAX_DEV_NACK_RETRY_CNT);
 		master->dev_nack_retry_cnt = MAX_DEV_NACK_RETRY_CNT;
 	}
+
+	INIT_WORK(&master->hj_work, dw_i3c_hj_work);
+	ret = i3c_master_register(&master->base, &pdev->dev,
+				  &dw_mipi_i3c_ops, false);
+	if (ret)
+		goto err_disable_pm;
 
 	return 0;
 
@@ -1727,10 +1727,10 @@ static void dw_i3c_master_restore_addrs(struct dw_i3c_master *master)
 		reg_val = readl(master->regs + DEV_ADDR_TABLE_LOC(master->datstartaddr, pos));
 
 		if (master->devs[pos].is_i2c_addr)
-			reg_val = DEV_ADDR_TABLE_LEGACY_I2C_DEV |
+			reg_val |= DEV_ADDR_TABLE_LEGACY_I2C_DEV |
 			       DEV_ADDR_TABLE_STATIC_ADDR(master->devs[pos].addr);
 		else
-			reg_val = DEV_ADDR_TABLE_DYNAMIC_ADDR(master->devs[pos].addr);
+			reg_val |= DEV_ADDR_TABLE_DYNAMIC_ADDR(master->devs[pos].addr);
 
 		writel(reg_val, master->regs + DEV_ADDR_TABLE_LOC(master->datstartaddr, pos));
 	}
