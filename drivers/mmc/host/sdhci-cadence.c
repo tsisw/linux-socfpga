@@ -739,7 +739,10 @@ static void sdhci_cdns_set_clock(struct sdhci_host *host, unsigned int clock)
 	struct sdhci_cdns_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	int ret;
 
-	ret = sdhci_cdns_combophy_init_sd_gen(priv);
+	if (host->mmc->actual_clock == 200000000)
+		ret = sdhci_cdns_combophy_init_sd_gen(priv);
+	else
+		pr_info("%s: skip setting HRS regs.\n", __func__);
 
 	sdhci_set_clock(host, clock);
 }
