@@ -162,7 +162,7 @@ jobs:
 
 #This action runs the simic regression test
   ci-verification:
-     runs-on: [self-hosted,linux-arc-runner]
+     runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
      needs: ci-build
      env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
@@ -192,7 +192,7 @@ jobs:
 
 #This action runs the on-board regression test
   ci-on-board-verification:
-    runs-on: [self-hosted,linux-arc-runner]
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
     needs: ci-build
     env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
