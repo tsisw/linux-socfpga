@@ -164,6 +164,9 @@ jobs:
   ci-verification:
      runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
      needs: ci-build
+     outputs:
+      parent_id: ${{ steps.extract.outputs.parent_id }}
+      spect_url: ${{ steps.extract.outputs.spetc_link }}
      env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
       EC_DISABLE_VAL: project,system
@@ -188,12 +191,24 @@ jobs:
           git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
           cd applications.devops.build-bot.github-pr-workflow
           git checkout master
-          bash workflow_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
+          bash workflow_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} | tee $GITHUB_WORKSPACE/output.log
+      - name: Extract Job id and spect url
+        id: extract
+        run: |
+          PARENT_ID=$(grep -oP 'The ID of the top-level farm job is \K[0-9]+' $GITHUB_WORKSPACE/output.log)
+          echo "Extracted Parent ID: $PARENT_ID"
+          echo "parent_id=$PARENT_ID" >> $GITHUB_OUTPUT
+          SPETC_LINK=$(grep -oP 'Link to SPeTC:\s*\K\S+' "$GITHUB_WORKSPACE/output.log")
+          echo "Extracted SPeTC Link: $SPETC_LINK"
+          echo "spetc_link=$SPETC_LINK" >> "$GITHUB_OUTPUT"
 
 #This action runs the on-board regression test
   ci-on-board-verification:
     runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
     needs: ci-build
+    outputs:
+      parent_id: ${{ steps.extract.outputs.parent_id }}
+      spect_url: ${{ steps.extract.outputs.spetc_link }}
     env:
       # Disable the warnings of Security violation. We need to check why this is trigger later, plaintext password.
       EC_DISABLE_VAL: project,system
@@ -218,7 +233,45 @@ jobs:
         git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
         cd applications.devops.build-bot.github-pr-workflow
         git checkout master
-        bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }}
+        bash workflow_On_Board_Regtest.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} | tee $GITHUB_WORKSPACE/output.log
+
+    - name: Extract Job id and spect url
+      id: extract
+      run: |
+        PARENT_ID=$(grep -oP 'The ID of the top-level farm job is \K[0-9]+' $GITHUB_WORKSPACE/output.log)
+        echo "Extracted Parent ID: $PARENT_ID"
+        echo "parent_id=$PARENT_ID" >> $GITHUB_OUTPUT
+        SPETC_LINK=$(grep -oP 'Link to SPeTC:\s*\K\S+' "$GITHUB_WORKSPACE/output.log")
+        echo "Extracted SPeTC Link: $SPETC_LINK"
+        echo "spetc_link=$SPETC_LINK" >> "$GITHUB_OUTPUT"
+
+#This actions checks the status of the on-board regression test
+  ci-on-board-verification-status:
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
+    needs: ci-on-board-verification
+    steps:
+      - name: Extract regtest parent ID
+        run: echo "Parent ID is ${{ needs.ci-on-board-verification.outputs.parent_id }}"
+      - name: On-board Regtest Status
+        run: |
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
+          git checkout master
+          bash workflow_Regtest_status_check.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} ${{ needs.ci-on-board-verification.outputs.parent_id }} ${{ needs.ci-on-board-verification.outputs.spect_url }}
+
+#This actions checks the status of the simic regression test
+  ci-verification-status:
+    runs-on: [ arc, lapwing, workspace_type=tmp-workspace, _site=png ]
+    needs: ci-verification
+    steps:
+      - name: Extract regtest parent ID
+        run: echo "Parent ID is ${{ needs.ci-on-board-verification.outputs.parent_id }}"
+      - name: Simic Regtest Status
+        run: |
+          git clone https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/altera-innersource/applications.devops.build-bot.github-pr-workflow
+          cd applications.devops.build-bot.github-pr-workflow
+          git checkout master
+          bash workflow_Regtest_status_check.sh ${{ github.workspace }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }} ${{ secrets.GITHUB_TOKEN }} ${{ needs.ci-verification.outputs.parent_id }} ${{ needs.ci-verification.outputs.spect_url }}
 
 #This action checks if the branch has been released and if so block PR until approved by repo Admin
   ci-check-tag:
@@ -248,10 +301,10 @@ jobs:
     container:
       image: amr-registry.sc.altera.com/pse-pswe-software-ba/embedded_coverity:ubuntu20.04.0_6-new-proxy-inbuilt
       options: -v /mnt/nfs_share/site/proj/psg:/p/psg
-    needs: [ci-coverity-parse-result, ci-verification, ci-checkpatch, ci-check-tag, ci-on-board-verification]
+    needs: [ci-coverity-parse-result, ci-verification-status, ci-checkpatch, ci-check-tag, ci-on-board-verification-status]
     steps:
      - name: On failure
-       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification.result != 'success'}}
+       if: ${{ needs.ci-coverity-parse-result.result != 'success' || needs.ci-verification-status.result != 'success' || needs.ci-checkpatch.result != 'success' || needs.ci-check-tag.result != 'success' || needs.ci-on-board-verification-status.result != 'success'}}
        run: |
           echo "Status check has failed."
           exit 1
