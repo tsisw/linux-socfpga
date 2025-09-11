@@ -769,13 +769,8 @@ static int dw_i3c_ccc_set(struct dw_i3c_master *master,
 		dw_i3c_master_dequeue_xfer(master, xfer);
 
 	ret = xfer->ret;
-
-	if (xfer->cmds[0].error == RESPONSE_ERROR_IBA_NACK ||
-			xfer->cmds[0].error == RESPONSE_ERROR_ADDRESS_NACK)
+	if (xfer->cmds[0].error == RESPONSE_ERROR_IBA_NACK)
 		ccc->err = I3C_ERROR_M2;
-
-	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME)
-		ccc->err = I3C_ERROR_M0;
 
 	dw_i3c_master_free_xfer(xfer);
 
@@ -815,14 +810,8 @@ static int dw_i3c_ccc_get(struct dw_i3c_master *master, struct i3c_ccc_cmd *ccc)
 		dw_i3c_master_dequeue_xfer(master, xfer);
 
 	ret = xfer->ret;
-
-	if (xfer->cmds[0].error == RESPONSE_ERROR_IBA_NACK ||
-			xfer->cmds[0].error == RESPONSE_ERROR_ADDRESS_NACK)
+	if (xfer->cmds[0].error == RESPONSE_ERROR_IBA_NACK)
 		ccc->err = I3C_ERROR_M2;
-
-	if (xfer->cmds[0].error == RESPONSE_ERROR_FRAME)
-		ccc->err = I3C_ERROR_M0;
-
 	dw_i3c_master_free_xfer(xfer);
 
 	return ret;

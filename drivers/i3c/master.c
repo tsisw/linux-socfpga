@@ -848,9 +848,6 @@ static int i3c_master_send_ccc_cmd_locked(struct i3c_master_controller *master,
 
 	ret = master->ops->send_ccc_cmd(master, cmd);
 	if (ret) {
-		if (cmd->err == I3C_ERROR_M0 || cmd->err == I3C_ERROR_M2)
-			ret = master->ops->send_ccc_cmd(master, cmd);
-
 		if (cmd->err != I3C_ERROR_UNKNOWN)
 			return cmd->err;
 
