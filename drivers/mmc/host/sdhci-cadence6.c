@@ -93,7 +93,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,ctrl-hrs07-timing-delay-sd-sdr12", 0x000A0001 }, // SD UHS1 SDR12
 		{ "cdns,ctrl-hrs07-timing-delay-sd-sdr25", 0x000A0001 }, // SD UHS1 SDR25
 		{ "cdns,ctrl-hrs07-timing-delay-sd-sdr50", 0x00090005 }, // SD UHS1 SDR50
-		{ "cdns,ctrl-hrs07-timing-delay-sd-sdr104", 0x00090005 }, // SD UHS1 SDR104
+		{ "cdns,ctrl-hrs07-timing-delay-sd-sdr104", 0x000a0001 }, // SD UHS1 SDR104
 		{ "cdns,ctrl-hrs07-timing-delay-sd-ddr50", 0x00090001 }, // SD UHS1 DDR50
 		{ "cdns,ctrl-hrs07-timing-delay-mmc-ddr52", 0x00090001 }, // MMC DDR52
 		{ "cdns,ctrl-hrs07-timing-delay-mmc-hs200", 0x00090000 }, // MMC HS200
@@ -108,7 +108,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,ctrl-hrs09-timing-delay-sd-sdr12", 0x0001800C },
 		{ "cdns,ctrl-hrs09-timing-delay-sd-sdr25", 0x0001800C },
 		{ "cdns,ctrl-hrs09-timing-delay-sd-sdr50", 0xf1c1800c },
-		{ "cdns,ctrl-hrs09-timing-delay-sd-sdr104", 0xf1c1800c },
+		{ "cdns,ctrl-hrs09-timing-delay-sd-sdr104", 0xf1c18000 },
 		{ "cdns,ctrl-hrs09-timing-delay-sd-ddr50", 0x0001800C },
 		{ "cdns,ctrl-hrs09-timing-delay-mmc-ddr52", 0x0001800C },
 		{ "cdns,ctrl-hrs09-timing-delay-mmc-hs200", 0xf1c18000 },
@@ -123,7 +123,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,ctrl-hrs10-timing-delay-sd-sdr12", 0x00030000 },
 		{ "cdns,ctrl-hrs10-timing-delay-sd-sdr25", 0x00030000 },
 		{ "cdns,ctrl-hrs10-timing-delay-sd-sdr50", 0x00020000 },
-		{ "cdns,ctrl-hrs10-timing-delay-sd-sdr104", 0x00020000 },
+		{ "cdns,ctrl-hrs10-timing-delay-sd-sdr104", 0x00090000 },
 		{ "cdns,ctrl-hrs10-timing-delay-sd-ddr50", 0x00020000 },
 		{ "cdns,ctrl-hrs10-timing-delay-mmc-ddr52", 0x00020000 },
 		{ "cdns,ctrl-hrs10-timing-delay-mmc-hs200", 0x00080000 },
@@ -168,7 +168,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,phy-gate-lpbk_ctrl-delay-sd-sdr12", 0x81a40040 },
 		{ "cdns,phy-gate-lpbk_ctrl-delay-sd-sdr25", 0x81a40040 },
 		{ "cdns,phy-gate-lpbk_ctrl-delay-sd-sdr50", 0x80a40040 },
-		{ "cdns,phy-gate-lpbk_ctrl-delay-sd-sdr104", 0x80a40040 },
+		{ "cdns,phy-gate-lpbk_ctrl-delay-sd-sdr104", 0x81a40040 },
 		{ "cdns,phy-gate-lpbk_ctrl-delay-sd-ddr50", 0x80a40040 },
 		{ "cdns,phy-gate-lpbk_ctrl-delay-mmc-ddr52", 0x81a40040 },
 		{ "cdns,phy-gate-lpbk_ctrl-delay-mmc-hs200", 0x81a40040 },
@@ -183,7 +183,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,phy-dll-master-ctrl-sd-sdr12", 0x00800004 },
 		{ "cdns,phy-dll-master-ctrl-sd-sdr25", 0x00800004 },
 		{ "cdns,phy-dll-master-ctrl-sd-sdr50", 0x00800004 },
-		{ "cdns,phy-dll-master-ctrl-sd-sdr104", 0x00204d00 },
+		{ "cdns,phy-dll-master-ctrl-sd-sdr104", 0x00000004 },
 		{ "cdns,phy-dll-master-ctrl-sd-ddr50", 0x00800000 },
 		{ "cdns,phy-dll-master-ctrl-mmc-ddr52", 0x00800000 },
 		{ "cdns,phy-dll-master-ctrl-mmc-hs200", 0x00204d00 },
@@ -198,7 +198,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,phy-dll-slave-ctrl-sd-sdr12", 0x00000000 },
 		{ "cdns,phy-dll-slave-ctrl-sd-sdr25", 0x00000000 },
 		{ "cdns,phy-dll-slave-ctrl-sd-sdr50", 0x04000004 },
-		{ "cdns,phy-dll-slave-ctrl-sd-sdr104", 0x04000004 },
+		{ "cdns,phy-dll-slave-ctrl-sd-sdr104", 0x004d4d00 },
 		{ "cdns,phy-dll-slave-ctrl-sd-ddr50", 0x00000000 },
 		{ "cdns,phy-dll-slave-ctrl-mmc-ddr52", 0x00000000 },
 		{ "cdns,phy-dll-slave-ctrl-mmc-hs200", 0x004dc600 },
@@ -213,7 +213,7 @@ static const struct sdhci_cdns6_ctrl_cfg reg_cfg[REG_CFG_MAX][MAX_TIMING_MODES] 
 		{ "cdns,phy-dq-timing-delay-sd-sdr12", 0x28000001 },
 		{ "cdns,phy-dq-timing-delay-sd-sdr25", 0x10000001 },
 		{ "cdns,phy-dq-timing-delay-sd-sdr50", 0x38000001 },
-		{ "cdns,phy-dq-timing-delay-sd-sdr104", 0x38000001 },
+		{ "cdns,phy-dq-timing-delay-sd-sdr104", 0x11000001 },
 		{ "cdns,phy-dq-timing-delay-sd-ddr50", 0x38000001 },
 		{ "cdns,phy-dq-timing-delay-mmc-ddr52", 0x10000001 },
 		{ "cdns,phy-dq-timing-delay-mmc-hs200", 0x00000001 },
@@ -378,7 +378,14 @@ int sdhci_cdns6_set_tune_val(struct sdhci_host *host, unsigned int val)
 		 PHY_DLL_SLAVE_CTRL_REG_READ_DQS_DELAY);
 	tmp |= FIELD_PREP(PHY_DLL_SLAVE_CTRL_REG_READ_DQS_CMD_DELAY, tuneval) |
 	       FIELD_PREP(PHY_DLL_SLAVE_CTRL_REG_READ_DQS_DELAY, tuneval);
+
+	/* Switch On the DLL Reset */
+	sdhci_cdns6_reset_phy_dll(host, true);
+
 	sdhci_cdns6_write_phy_reg(priv, PHY_DLL_SLAVE_CTRL_REG_ADDR, tmp);
+
+	/* Switch Off the DLL Reset */
+	sdhci_cdns6_reset_phy_dll(host, false);
 
 	return 0;
 }
