@@ -2,11 +2,12 @@
 /*
  * Copyright (C) 2019, Intel Corporation
  */
-#include "socfpga_agilex.dtsi"
+#include "socfpga_agilex_bittware.dtsi"
+#include "socfpga_agilex_pcie_root_port.dtsi"
+#include "fm87_ftile_10g_2port_ptp.dtsi"
 
 / {
-	model = "SoCFPGA Agilex SoCDK";
-	compatible = "intel,socfpga-agilex-socdk", "intel,socfpga-agilex";
+	model = "SoCFPGA Agilex BittWare";
 
 	aliases {
 		serial0 = &uart0;
@@ -37,10 +38,10 @@
 		};
 	};
 
-	memory@80000000 {
+	memory {
 		device_type = "memory";
 		/* We expect the bootloader to fill in the reg */
-		reg = <0 0x80000000 0 0>;
+		reg = <0 0 0 0>;
 	};
 };
 
@@ -48,9 +49,9 @@
 	status = "okay";
 };
 
-&gmac0 {
+&gmac2 {
 	status = "okay";
-	phy-mode = "rgmii";
+	phy-mode = "gmii"; /* gmii from rgmii */
 	phy-handle = <&phy0>;
 
 	max-frame-size = <9000>;
@@ -78,12 +79,25 @@
 	};
 };
 
-&mmc {
+&nand {
 	status = "okay";
-	cap-sd-highspeed;
-	broken-cd;
-	bus-width = <4>;
-	clk-phase-sd-hs = <0>, <135>;
+	nand-bus-width = <8>;
+
+	flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0>;
+		nand-bus-width = <8>;
+
+		partition@0 {
+			label = "u-boot";
+			reg = <0 0x200000>;
+		};
+		partition@200000 {
+			label = "root";
+			reg = <0x200000 0x1fe00000>;
+		};
+	};
 };
 
 &osc1 {
@@ -101,41 +115,6 @@
 
 &watchdog0 {
 	status = "okay";
-};
-
-&qspi {
-	status = "okay";
-	flash@0 {
-		compatible = "micron,mt25qu02g", "jedec,spi-nor";
-		reg = <0>;
-		spi-max-frequency = <100000000>;
-
-		m25p,fast-read;
-		cdns,read-delay = <2>;
-		cdns,tshsl-ns = <50>;
-		cdns,tsd2d-ns = <50>;
-		cdns,tchsh-ns = <4>;
-		cdns,tslch-ns = <4>;
-		spi-tx-bus-width = <4>;
-		spi-rx-bus-width = <4>;
-
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			rsu-handle = <&qspi_boot>;
-
-			qspi_boot: partition@0 {
-				label = "Boot and fpga data";
-				reg = <0x0 0x04200000>;
-			};
-
-			root: partition@4200000 {
-				label = "Root Filesystem - UBIFS";
-				reg = <0x04200000 0x0BE00000>;
-			};
-		};
-	};
 };
 
 &temp_volt {
@@ -202,4 +181,22 @@
 			reg = <0x40000>;
 		};
 	};
+};
+
+&pcie_0_pcie_aglx {
+	status = "okay";
+	compatible = "altr,pcie-root-port-3.0-f-tile";
+};
+
+&gmac0 {
+    status = "okay";
+    phy-mode = "gmii"; /* gmii from rgmii */
+    //phy-handle = <&phy0>; /* added after tcpdump */
+
+    fixed-link {
+        speed = <1000>;
+        full-duplex;
+        pause;
+        asym-pause;
+    };
 };
