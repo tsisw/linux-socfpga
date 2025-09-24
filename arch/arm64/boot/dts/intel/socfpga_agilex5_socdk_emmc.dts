@@ -13,11 +13,10 @@
 	status = "okay";
 	no-sd;
 	no-sdio;
+	no-1-8-v;
 	disable-wp;
 	non-removable;
 	cap-mmc-highspeed;
-	mmc-hs200-1_8v;
-	mmc-hs400-1_8v;
 
 	bus-width = <8>;
 	vmmc-supply = <&sd_emmc_power>;
