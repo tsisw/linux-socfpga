@@ -653,6 +653,14 @@ static int socfpga_dwmac_probe(struct platform_device *pdev)
 	ndev = platform_get_drvdata(pdev);
 	stpriv = netdev_priv(ndev);
 
+	if (plat_dat->has_xgmac) {
+		/* For Agilex5 which has XGMAC, re-enable the Rx Watchdog Timer */
+		plat_dat->riwt_off = 0;
+		stpriv->use_riwt = 1;
+		dev_info(stpriv->device,
+			 "Enable RX Mitigation via HW Watchdog Timer\n");
+	}
+
 	/* The socfpga driver needs to control the stmmac reset to set the phy
 	 * mode. Create a copy of the core reset handle so it can be used by
 	 * the driver later.
