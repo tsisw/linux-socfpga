@@ -1455,9 +1455,9 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req)
 		nvme_poll_irqdisable(nvmeq);
 
 	if (blk_mq_rq_state(req) != MQ_RQ_IN_FLIGHT) {
-		dev_warn(dev->ctrl.device,
+		/*dev_warn(dev->ctrl.device,
 			 "I/O tag %d (%04x) QID %d timeout, completion polled\n",
-			 req->tag, nvme_cid(req), nvmeq->qid);
+			 req->tag, nvme_cid(req), nvmeq->qid);*/
 		return BLK_EH_DONE;
 	}
 
