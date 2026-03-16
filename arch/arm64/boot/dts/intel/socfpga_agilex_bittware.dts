@@ -14,6 +14,9 @@
 		ethernet0 = &gmac0;
 		ethernet1 = &gmac1;
 		ethernet2 = &gmac2;
+		txe0 = &txe0;
+		txe1 = &txe1;
+
 	};
 
 	chosen {
@@ -199,4 +202,5 @@
         pause;
         asym-pause;
     };
+
 };
