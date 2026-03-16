@@ -686,17 +686,16 @@
 			status = "disabled";
 		};
 
-                
 		txe0: txe@0 {
 		        compatible = "tsi,txe";
-        		status = "okay";
+			status = "okay";
 			mmu_status = "disabled";
 			instance-id = <0>;
                         };
 
 		txe1: txe@1 {
 		        compatible = "tsi,txe";
-        		status = "okay";
+			status = "okay";
 			mmu_status = "disabled";
 			instance-id = <1>;
                         };
