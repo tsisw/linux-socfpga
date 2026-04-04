@@ -693,13 +693,6 @@
 			instance-id = <0>;
                         };
 
-		txe1: txe@1 {
-			compatible = "tsi,txe";
-			status = "okay";
-			mmu_status = "disabled";
-			instance-id = <1>;
-                        };
-
 		firmware {
 			svc {
 				compatible = "intel,agilex-svc";
