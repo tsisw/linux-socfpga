@@ -5,7 +5,7 @@
  * Copyright (C) 2025 Altera Corporation
  *   Author: Tanmay Kathpalia <tanmay.kathpalia@altera.com>
  */
-
+#include <linux/bitfield.h>
 #include "sdhci-cadence.h"
 
 /* IO Delay Information */
