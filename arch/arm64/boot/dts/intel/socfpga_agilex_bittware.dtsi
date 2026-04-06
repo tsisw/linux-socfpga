@@ -52,6 +52,7 @@
 		memory-region = <&service_reserved2>;
 	};
 
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -684,6 +685,21 @@
 
 			status = "disabled";
 		};
+
+                
+		txe0: txe@0 {
+		        compatible = "tsi,txe";
+        		status = "okay";
+			mmu_status = "disabled";
+			instance-id = <0>;
+                        };
+
+		txe1: txe@1 {
+		        compatible = "tsi,txe";
+        		status = "okay";
+			mmu_status = "disabled";
+			instance-id = <1>;
+                        };
 
 		firmware {
 			svc {
