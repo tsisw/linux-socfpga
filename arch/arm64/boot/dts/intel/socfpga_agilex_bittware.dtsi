@@ -687,7 +687,7 @@
 		};
 
 		txe0: txe@0 {
-		        compatible = "tsi,txe";
+			compatible = "tsi,txe";
 			status = "okay";
 			mmu_status = "disabled";
 			instance-id = <0>;
