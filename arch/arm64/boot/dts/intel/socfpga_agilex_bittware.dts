@@ -199,4 +199,21 @@
         pause;
         asym-pause;
     };
+
+    aliases {
+		txe0 = &txe0;
+		txe1 = &txe1;
+        };
+
+        txe0: txe@0 {
+		compatible = "tsi,txe";
+		status = "okay";
+		mmu_status = "disable";
+       };
+
+       txe1: txe@1 {
+		compatible = "tsi,txe";
+		status = "okay";
+		mmu_status = "disable";
+       };
 };
