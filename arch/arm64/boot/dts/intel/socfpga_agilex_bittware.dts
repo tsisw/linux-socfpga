@@ -188,6 +188,23 @@
 	compatible = "altr,pcie-root-port-3.0-f-tile";
 };
 
+aliases {
+                txe0 = &txe0;
+                txe1 = &txe1;
+        };
+
+txe0: txe@0 {
+                compatible = "tsi,txe";
+                status = "okay";
+                mmu_status = "disable";
+       };
+
+txe1: txe@1 {
+                compatible = "tsi,txe";
+                status = "okay";
+                mmu_status = "disable";
+       };
+
 &gmac0 {
     status = "okay";
     phy-mode = "gmii"; /* gmii from rgmii */
@@ -200,20 +217,4 @@
         asym-pause;
     };
 
-    aliases {
-		txe0 = &txe0;
-		txe1 = &txe1;
-        };
-
-        txe0: txe@0 {
-		compatible = "tsi,txe";
-		status = "okay";
-		mmu_status = "disable";
-       };
-
-       txe1: txe@1 {
-		compatible = "tsi,txe";
-		status = "okay";
-		mmu_status = "disable";
-       };
 };
