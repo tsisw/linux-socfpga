@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/gpio/tsi,skylp-gpio.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TSI SkyLP IO-corner GPIO controller
+
+maintainers:
+  - Tsavorite Scalable Intelligence BMC team
+
+description:
+  Dedicated GPIO pads of one SkyLP IO corner (IONW GPIO_0..7, IONE
+  fail-safe GPIO_FS_0..3). Must be a child of a tsi,skylp-chiplet
+  node; reg is the corner block offset within the chiplet CSR window
+  and all access goes through the chiplet core.
+
+  Pin events latch in the corner's interrupt collector, which fans out
+  to four maskable destination groups (g0..g3); one of them is meant
+  to reach the A520 GIC as an SPI. The driver supports acting as an
+  interrupt-controller, but this is dormant unless "interrupts" is
+  present: the collector-to-GIC wiring (which group, the SPI INTID,
+  edge/level sensitivity) is not yet confirmed against the SoC
+  interrupt map, and the IO list states GPIO alerts/interrupts are
+  controlled by the M85 management core, which is an open ownership
+  question independent of the wiring. Do not add "interrupts" to a
+  node until both are resolved.
+
+properties:
+  compatible:
+    enum:
+      - tsi,skylp-gpio-ionw
+      - tsi,skylp-gpio-ione
+
+  reg:
+    maxItems: 1
+
+  gpio-controller: true
+
+  "#gpio-cells":
+    const: 2
+
+  gpio-line-names:
+    minItems: 4
+    maxItems: 8
+
+  interrupts:
+    maxItems: 1
+    description:
+      Chained parent SPI carrying the destination group selected by
+      tsi,irq-dest-group. Absent by default; see the description above.
+
+  interrupt-controller: true
+
+  "#interrupt-cells":
+    const: 2
+
+  tsi,irq-dest-group:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 0
+    maximum: 3
+    default: 0
+    description:
+      Which of the four maskable destination groups (g0..g3) in the
+      corner's interrupt collector carries this node's "interrupts"
+      SPI. Not verified against hardware; meaningless without
+      "interrupts".
+
+required:
+  - compatible
+  - reg
+  - gpio-controller
+  - "#gpio-cells"
+
+dependencies:
+  interrupts: [interrupt-controller, "#interrupt-cells"]
+  interrupt-controller: [interrupts]
+  tsi,irq-dest-group: [interrupts]
+
+additionalProperties: false
+
+examples:
+  - |
+    gpio@13000000 {
+        compatible = "tsi,skylp-gpio-ionw";
+        reg = <0x13000000 0x200>;
+        gpio-controller;
+        #gpio-cells = <2>;
+    };

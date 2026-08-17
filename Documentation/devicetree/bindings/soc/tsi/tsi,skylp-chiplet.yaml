@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/soc/tsi/tsi,skylp-chiplet.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TSI SKYLP chiplet CSR window
+
+maintainers:
+  - Tsavorite Scalable Intelligence BMC team
+
+description:
+  One TSI chiplet exposes its control/status registers through a single
+  CSR window. The chiplet core owns the window and provides register
+  access to the IP blocks (gpio, pvt, mbox, i2c, wdt), which are
+  declared as children addressed by offset within the window.
+
+properties:
+  compatible:
+    const: tsi,skylp-chiplet
+
+  reg:
+    maxItems: 1
+
+  tsi,chiplet-id:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: Logical chiplet index used for CSR request tagging.
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 1
+
+  ranges: true
+
+patternProperties:
+  "^(gpio|pvt|mailbox|i2c|watchdog)@[0-9a-f]+$":
+    type: object
+
+required:
+  - compatible
+  - reg
+  - tsi,chiplet-id
+  - ranges
+
+additionalProperties: false
+
+examples:
+  - |
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        chiplet@2040000000 {
+            compatible = "tsi,skylp-chiplet";
+            reg = <0x20 0x40000000 0x0 0x1c000000>;
+            tsi,chiplet-id = <0>;
+            #address-cells = <1>;
+            #size-cells = <1>;
+            ranges = <0x0 0x20 0x40000000 0x1c000000>;
+
+            gpio@13000000 {
+                compatible = "tsi,skylp-gpio-ionw";
+                reg = <0x13000000 0x200>;
+                gpio-controller;
+                #gpio-cells = <2>;
+            };
+        };
+    };
