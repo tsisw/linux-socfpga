@@ -74,6 +74,9 @@ static int tsi_chiplet_probe(struct platform_device *pdev)
 	if (IS_ERR(base))
 		return PTR_ERR(base);
 
+	if (resource_size(res) < 4 || (resource_size(res) & 0x3))
+		return dev_err_probe(dev, -EINVAL,
+				     "invalid CSR window size\n");
 	regmap_cfg.max_register = resource_size(res) - 4;
 	chiplet->regmap = devm_regmap_init_mmio(dev, base, &regmap_cfg);
 	if (IS_ERR(chiplet->regmap))

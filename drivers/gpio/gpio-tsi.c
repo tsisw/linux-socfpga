@@ -513,9 +513,13 @@ static void tsi_gpio_irq_ack(struct irq_data *d)
  */
 VISIBLE_IF_KUNIT int tsi_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 {
-	if (type & IRQ_TYPE_LEVEL_MASK)
+	switch (type) {
+	case IRQ_TYPE_LEVEL_HIGH:
+	case IRQ_TYPE_LEVEL_LOW:
 		return 0;
-	return -EINVAL;
+	default:
+		return -EINVAL;
+	}
 }
 EXPORT_SYMBOL_IF_KUNIT(tsi_gpio_irq_set_type);
 
@@ -677,7 +681,8 @@ static int tsi_gpio_probe(struct platform_device *pdev)
 	u32 base, irq_grp = 0;
 	int irq, ret;
 
-	dev_dbg(dev, "probe: compatible=%s\n", dev_of_node(dev)->name);
+	dev_dbg(dev, "probe: compatible=%s\n",
+		dev_of_node(dev) ? dev_of_node(dev)->name : "<none>");
 
 	soc = device_get_match_data(dev);
 	if (!soc)
@@ -703,6 +708,11 @@ static int tsi_gpio_probe(struct platform_device *pdev)
 				     "tsi,irq-dest-group must be 0..3\n");
 
 	irq = platform_get_irq_optional(pdev, 0);
+	if (irq == -ENXIO)
+		irq = 0;
+	else if (irq < 0)
+		return dev_err_probe(dev, irq, "failed to get optional IRQ\n");
+
 	if (irq > 0)
 		dev_dbg(dev, "probe: interrupts property present, irq=%d\n",
 			irq);
