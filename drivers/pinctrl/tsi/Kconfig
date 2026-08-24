@@ -23,9 +23,8 @@ config PINCTRL_TSI
 	  group at once, not per pad, so a devicetree node should claim a
 	  complete group.
 
-	  This driver supersedes GPIO_TSI, which only handled the pads
-	  that have no alternate function. Do not enable both for the
-	  same corner.
+	  This driver replaces the earlier GPIO-only TSI driver, which
+	  handled just the pads that have no alternate function.
 
 config PINCTRL_TSI_KUNIT_TEST
 	tristate "KUnit tests for the TSI pinctrl driver" if !KUNIT_ALL_TESTS

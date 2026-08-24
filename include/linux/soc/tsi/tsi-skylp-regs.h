@@ -60,11 +60,12 @@
 #define TSI_SKYLP_IONE_GPIO_DATA_IN	0x18c
 
 /*
- * Interrupt collectors (per-source R/W1C latched). Recorded for a
- * future irqchip; NOT consumed by gpio-tsi today: the IO list
- * documents GPIO alerts/interrupts as owned by the M85, and the
- * group-to-GIC wiring, SPI INTID, and edge/level sensitivity are
- * not in the CSR spec (open items A/B/C).
+ * Interrupt collectors (per-source R/W1C latched). pinctrl-tsi
+ * carries its own per-corner collector offsets and arms them only
+ * when a DT node declares "interrupts": the IO list documents GPIO
+ * alerts/interrupts as owned by the M85, and the group-to-GIC
+ * wiring, SPI INTID, and edge/level sensitivity are not in the CSR
+ * spec (open items A/B/C).
  */
 #define TSI_SKYLP_IONW_T2_INTR		0x34c0
 #define TSI_SKYLP_IONW_T2_INTR_W1C	0x34c4

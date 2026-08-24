@@ -1590,33 +1590,6 @@ config GPIO_TQMX86
 	help
 	  This driver supports GPIO on the TQMX86 IO controller.
 
-config GPIO_TSI
-	tristate "TSI SoC GPIO controller"
-	depends on TSI_CHIPLET || COMPILE_TEST
-	depends on OF_GPIO || COMPILE_TEST
-	select REGMAP
-	select GPIOLIB_IRQCHIP
-	help
-	  Say yes here to support the GPIO controller block of a TSI
-	  chiplet. Registers are accessed through the TSI chiplet core
-	  driver.
-
-	  Interrupt support is dormant unless the DT node declares an
-	  "interrupts" property; no shipped tsi-soc.dtsi node does so
-	  today pending confirmation of the collector-to-GIC wiring.
-
-config GPIO_TSI_KUNIT_TEST
-	tristate "KUnit tests for the TSI GPIO driver" if !KUNIT_ALL_TESTS
-	depends on GPIO_TSI && KUNIT
-	default KUNIT_ALL_TESTS
-	help
-	  Builds unit tests for the TSI GPIO driver: line/bit mapping,
-	  OE/IE direction encoding, and write ordering, against a fake
-	  register model instead of hardware. Runs under UML via
-	  tools/testing/kunit/kunit.py with drivers/gpio/gpio-tsi.kunitconfig.
-
-	  Say N unless you are developing the driver.
-
 config GPIO_TWL4030
 	tristate "TWL4030, TWL5030, and TPS659x0 GPIOs"
 	depends on TWL4030_CORE

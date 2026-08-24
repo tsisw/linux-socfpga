@@ -12,7 +12,7 @@ maintainers:
 description:
   One TSI chiplet exposes its control/status registers through a single
   CSR window. The chiplet core owns the window and provides register
-  access to the IP blocks (gpio, pvt, mbox, i2c, wdt), which are
+  access to the IP blocks (pinctrl/gpio, pvt, mbox, i2c, wdt), which are
   declared as children addressed by offset within the window.
 
 properties:
@@ -35,7 +35,7 @@ properties:
   ranges: true
 
 patternProperties:
-  "^(gpio|pvt|mailbox|i2c|watchdog)@[0-9a-f]+$":
+  "^(pinctrl|pvt|mailbox|i2c|watchdog)@[0-9a-f]+$":
     type: object
 
 required:
@@ -66,9 +66,9 @@ examples:
             #size-cells = <1>;
             ranges = <0x0 0x20 0x40000000 0x1c000000>;
 
-            gpio@13000000 {
-                compatible = "tsi,skylp-gpio-ionw";
-                reg = <0x13000000 0x200>;
+            pinctrl@13000000 {
+                compatible = "tsi,skylp-ionw-pinctrl";
+                reg = <0x13000000 0x3500>;
                 gpio-controller;
                 #gpio-cells = <2>;
             };
