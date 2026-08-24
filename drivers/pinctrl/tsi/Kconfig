@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config PINCTRL_TSI
+	tristate "TSI chiplet IO-corner pinctrl and GPIO"
+	depends on OF
+	depends on TSI_CHIPLET || COMPILE_TEST
+	select GENERIC_PINCONF
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
+	select GPIOLIB
+	select GPIOLIB_IRQCHIP
+	select REGMAP
+	help
+	  Combined pinctrl and GPIO driver for the IO corners of a TSI
+	  chiplet. SkyLP (IONW, IONE, IOSE, IOSW) is the only chiplet
+	  described today; other chiplets add their own pad tables to the
+	  same driver. Registers are reached through the TSI chiplet core
+	  driver.
+
+	  Most corner pads are multiplexed between an on-chip peripheral
+	  (SPI/QSPI/OSPI, I2C/SMB, I3C, UART, I2S, PCIe PERST/MDIO, LED,
+	  PWM) and GPIO. The hardware selects a function for a whole pad
+	  group at once, not per pad, so a devicetree node should claim a
+	  complete group.
+
+	  This driver supersedes GPIO_TSI, which only handled the pads
+	  that have no alternate function. Do not enable both for the
+	  same corner.
+
+config PINCTRL_TSI_KUNIT_TEST
+	tristate "KUnit tests for the TSI pinctrl driver" if !KUNIT_ALL_TESTS
+	depends on PINCTRL_TSI && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Builds unit tests for the TSI pinctrl/GPIO driver: pad to
+	  data-bit mapping, iomode (mux) encodings, group-wide muxing,
+	  OE/IE direction encoding, write ordering and pin configuration,
+	  all against a fake register model instead of hardware. Runs
+	  under UML via tools/testing/kunit/kunit.py.
+
+	  Say N unless you are developing the driver.

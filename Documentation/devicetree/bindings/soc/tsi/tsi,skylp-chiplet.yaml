@@ -43,6 +43,12 @@ required:
   - reg
   - tsi,chiplet-id
   - ranges
+  # Both are required, not optional: IP child nodes declare their window
+  # as <offset size> relative to these ranges, and their drivers read it
+  # as exactly two cells. Omitting them would let the devicetree defaults
+  # apply and silently change how a child's reg is interpreted.
+  - "#address-cells"
+  - "#size-cells"
 
 additionalProperties: false
 
