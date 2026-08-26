@@ -91,32 +91,32 @@
 /* ---------------- IONW (CF802), corner base 0x13000000 ---------------- */
 
 static const struct tsi_pin tsi_ionw_pins[] = {
-	TSI_PAD("GPIO_0",	0x11c),
-	TSI_PAD("GPIO_1",	0x120),
-	TSI_PAD("GPIO_2",	0x124),
-	TSI_PAD("GPIO_3",	0x128),
-	TSI_PAD("PCLKREQ_IO",	0x118),
-	TSI_PAD("PWAKE_IO",	0x114),
-	TSI_PAD("TLP_PERST_0",	0x104),
-	TSI_PAD("TLP_PERST_1",	0x108),
-	TSI_PAD("TLP_PERST_3",	0x110),
-	TSI_PAD("SPI_IO0",	0x144),
-	TSI_PAD("SPI_IO1",	0x148),
-	TSI_PAD("SPI_IO2",	0x14c),
-	TSI_PAD("SPI_IO3",	0x150),
-	TSI_PAD("SPI_IO4",	0x154),
-	TSI_PAD("SPI_IO5",	0x158),
-	TSI_PAD("SPI_IO6",	0x15c),
-	TSI_PAD("SPI_IO7",	0x160),
-	TSI_PAD("SPI_IO8",	0x164),
-	TSI_PAD("SPI_IO9",	0x168),
-	TSI_PAD("SPI_SCLK",	0x140),
-	TSI_PAD("SPI_SCS",	0x13c),
-	TSI_PAD("GPIO_4",	0x12c),
-	TSI_PAD("GPIO_5",	0x130),
-	TSI_PAD("GPIO_6",	0x134),
-	TSI_PAD("GPIO_7",	0x138),
-	TSI_PAD("TLP_PERST_2",	0x10c),
+	TSI_PAD("GPIO_0",	TSI_SKYLP_IONW_GPIO0_CTRL),
+	TSI_PAD("GPIO_1",	TSI_SKYLP_IONW_GPIO1_CTRL),
+	TSI_PAD("GPIO_2",	TSI_SKYLP_IONW_GPIO2_CTRL),
+	TSI_PAD("GPIO_3",	TSI_SKYLP_IONW_GPIO3_CTRL),
+	TSI_PAD("PCLKREQ_IO",	TSI_SKYLP_IONW_PCLKREQ_CTRL),
+	TSI_PAD("PWAKE_IO",	TSI_SKYLP_IONW_PWAKE_CTRL),
+	TSI_PAD("TLP_PERST_0",	TSI_SKYLP_IONW_PRST0_CTRL),
+	TSI_PAD("TLP_PERST_1",	TSI_SKYLP_IONW_PRST1_CTRL),
+	TSI_PAD("TLP_PERST_3",	TSI_SKYLP_IONW_PRST3_CTRL),
+	TSI_PAD("SPI_IO0",	TSI_SKYLP_IONW_SPI_IO0_CTRL),
+	TSI_PAD("SPI_IO1",	TSI_SKYLP_IONW_SPI_IO1_CTRL),
+	TSI_PAD("SPI_IO2",	TSI_SKYLP_IONW_SPI_IO2_CTRL),
+	TSI_PAD("SPI_IO3",	TSI_SKYLP_IONW_SPI_IO3_CTRL),
+	TSI_PAD("SPI_IO4",	TSI_SKYLP_IONW_SPI_IO4_CTRL),
+	TSI_PAD("SPI_IO5",	TSI_SKYLP_IONW_SPI_IO5_CTRL),
+	TSI_PAD("SPI_IO6",	TSI_SKYLP_IONW_SPI_IO6_CTRL),
+	TSI_PAD("SPI_IO7",	TSI_SKYLP_IONW_SPI_IO7_CTRL),
+	TSI_PAD("SPI_IO8",	TSI_SKYLP_IONW_SPI_IO8_CTRL),
+	TSI_PAD("SPI_IO9",	TSI_SKYLP_IONW_SPI_IO9_CTRL),
+	TSI_PAD("SPI_SCLK",	TSI_SKYLP_IONW_SPI_SCLK_CTRL),
+	TSI_PAD("SPI_SCS",	TSI_SKYLP_IONW_SPI_SCS_CTRL),
+	TSI_PAD("GPIO_4",	TSI_SKYLP_IONW_GPIO4_CTRL),
+	TSI_PAD("GPIO_5",	TSI_SKYLP_IONW_GPIO5_CTRL),
+	TSI_PAD("GPIO_6",	TSI_SKYLP_IONW_GPIO6_CTRL),
+	TSI_PAD("GPIO_7",	TSI_SKYLP_IONW_GPIO7_CTRL),
+	TSI_PAD("TLP_PERST_2",	TSI_SKYLP_IONW_PRST2_CTRL),
 };
 
 static const unsigned int tsi_ionw_gpio_pins[] = { 0, 1, 2, 3, 21, 22, 23, 24 };
@@ -159,13 +159,13 @@ static const struct tsi_mux_opt tsi_ionw_spi_opts[] = {
 static const struct tsi_group tsi_ionw_groups[] = {
 	TSI_GROUP_GPIO("gpio", tsi_ionw_gpio_pins),
 	TSI_GROUP_MUX("pcie", tsi_ionw_pcie_pins,
-		      0x188, 0, 1, tsi_ionw_pcie_opts),
+		      TSI_SKYLP_IONW_PCIE_IOMODE, 0, 1, tsi_ionw_pcie_opts),
 	TSI_GROUP_MUX("perst01", tsi_ionw_perst01_pins,
-		      0x180, 0, 2, tsi_ionw_perst01_opts),
+		      TSI_SKYLP_IONW_PRST_IOMODE, 0, 2, tsi_ionw_perst01_opts),
 	TSI_GROUP_MUX("perst23", tsi_ionw_perst23_pins,
-		      0x184, 0, 1, tsi_ionw_perst23_opts),
+		      TSI_SKYLP_IONW_PRST_IOMODE_1, 0, 1, tsi_ionw_perst23_opts),
 	TSI_GROUP_MUX("spi", tsi_ionw_spi_pins,
-		      0x18c, 0, 3, tsi_ionw_spi_opts),
+		      TSI_SKYLP_IONW_SPI_IOMODE, 0, 3, tsi_ionw_spi_opts),
 };
 
 VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_ionw_soc = {
@@ -174,13 +174,13 @@ VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_ionw_soc = {
 	.npins		= ARRAY_SIZE(tsi_ionw_pins),
 	.groups		= tsi_ionw_groups,
 	.ngroups	= ARRAY_SIZE(tsi_ionw_groups),
-	.data_out_off	= 0x178,
-	.data_in_off	= 0x17c,
+	.data_out_off	= TSI_SKYLP_IONW_GPIO_DATA_OUT,
+	.data_in_off	= TSI_SKYLP_IONW_GPIO_DATA_IN,
 	/* t2 collector: 26 gpio_intr sources, nothing else. */
-	.irq_w1c_off	= 0x34c4,
-	.irq_glben_off	= 0x34cc,
-	.irq_grp0_ip_off = 0x34d4,
-	.irq_grp0_en_off = 0x34d8,
+	.irq_w1c_off	= TSI_SKYLP_IONW_T2_INTR_W1C,
+	.irq_glben_off	= TSI_SKYLP_IONW_T2_INTR_EN,
+	.irq_grp0_ip_off = TSI_SKYLP_IONW_T2_G0_IP,
+	.irq_grp0_en_off = TSI_SKYLP_IONW_T2_G0_EN,
 	.irq_bit_shift	= 0,
 };
 EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_ionw_soc);
@@ -188,31 +188,31 @@ EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_ionw_soc);
 /* ---------------- IONE (CF803), corner base 0x6000000 ----------------- */
 
 static const struct tsi_pin tsi_ione_pins[] = {
-	TSI_PAD("I2C_SMB_SCL_0",	0x134),
-	TSI_PAD("I2C_SMB_SDA_0",	0x138),
-	TSI_PAD("I2C_SMB_SCL_1",	0x13c),
-	TSI_PAD("I2C_SMB_SDA_1",	0x140),
-	TSI_PAD("I2C_SMB_SCL_2",	0x144),
-	TSI_PAD("I2C_SMB_SDA_2",	0x148),
-	TSI_PAD("I2C_SMB_SCL_3",	0x14c),
-	TSI_PAD("I2C_SMB_SDA_3",	0x150),
-	TSI_PAD("I2C_I3C_SCL_3",	0x154),
-	TSI_PAD("I2C_I3C_SDA_3",	0x158),
-	TSI_PAD("GPIO_FS_0",		0x124),
-	TSI_PAD("GPIO_FS_1",		0x128),
-	TSI_PAD("GPIO_FS_2",		0x12c),
-	TSI_PAD("GPIO_FS_3",		0x130),
-	TSI_PAD("UART_RTS_1",		0x11c),
-	TSI_PAD("UART_RX_0",		0x104),
-	TSI_PAD("UART_CTS_0",		0x108),
-	TSI_PAD("UART_TX_0",		0x10c),
-	TSI_PAD("UART_RTS_0",		0x110),
-	TSI_PAD("UART_RX_1",		0x114),
-	TSI_PAD("UART_TX_1",		0x118),
-	TSI_PAD("LED_0",		0x15c),
-	TSI_PAD("LED_1",		0x160),
-	TSI_PAD("FAN_PWM",		0x164),
-	TSI_PAD("UART_CTS_1",		0x120),
+	TSI_PAD("I2C_SMB_SCL_0",	TSI_SKYLP_IONE_I2C_SMB_SCL0_CTRL),
+	TSI_PAD("I2C_SMB_SDA_0",	TSI_SKYLP_IONE_I2C_SMB_SDA0_CTRL),
+	TSI_PAD("I2C_SMB_SCL_1",	TSI_SKYLP_IONE_I2C_SMB_SCL1_CTRL),
+	TSI_PAD("I2C_SMB_SDA_1",	TSI_SKYLP_IONE_I2C_SMB_SDA1_CTRL),
+	TSI_PAD("I2C_SMB_SCL_2",	TSI_SKYLP_IONE_I2C_SMB_SCL2_CTRL),
+	TSI_PAD("I2C_SMB_SDA_2",	TSI_SKYLP_IONE_I2C_SMB_SDA2_CTRL),
+	TSI_PAD("I2C_SMB_SCL_3",	TSI_SKYLP_IONE_I2C_SMB_SCL3_CTRL),
+	TSI_PAD("I2C_SMB_SDA_3",	TSI_SKYLP_IONE_I2C_SMB_SDA3_CTRL),
+	TSI_PAD("I2C_I3C_SCL_3",	TSI_SKYLP_IONE_I3C_SCL3_CTRL),
+	TSI_PAD("I2C_I3C_SDA_3",	TSI_SKYLP_IONE_I3C_SDA3_CTRL),
+	TSI_PAD("GPIO_FS_0",		TSI_SKYLP_IONE_GPIO_FS0_CTRL),
+	TSI_PAD("GPIO_FS_1",		TSI_SKYLP_IONE_GPIO_FS1_CTRL),
+	TSI_PAD("GPIO_FS_2",		TSI_SKYLP_IONE_GPIO_FS2_CTRL),
+	TSI_PAD("GPIO_FS_3",		TSI_SKYLP_IONE_GPIO_FS3_CTRL),
+	TSI_PAD("UART_RTS_1",		TSI_SKYLP_IONE_UART_RTS_1_CTRL),
+	TSI_PAD("UART_RX_0",		TSI_SKYLP_IONE_UART_RX_0_CTRL),
+	TSI_PAD("UART_CTS_0",		TSI_SKYLP_IONE_UART_CTS_0_CTRL),
+	TSI_PAD("UART_TX_0",		TSI_SKYLP_IONE_UART_TX_0_CTRL),
+	TSI_PAD("UART_RTS_0",		TSI_SKYLP_IONE_UART_RTS_0_CTRL),
+	TSI_PAD("UART_RX_1",		TSI_SKYLP_IONE_UART_RX_1_CTRL),
+	TSI_PAD("UART_TX_1",		TSI_SKYLP_IONE_UART_TX_1_CTRL),
+	TSI_PAD("LED_0",		TSI_SKYLP_IONE_LED_0_CTRL),
+	TSI_PAD("LED_1",		TSI_SKYLP_IONE_LED_1_CTRL),
+	TSI_PAD("FAN_PWM",		TSI_SKYLP_IONE_FAN_PWM_CTRL),
+	TSI_PAD("UART_CTS_1",		TSI_SKYLP_IONE_UART_CTS_1_CTRL),
 };
 
 static const unsigned int tsi_ione_gpio_fs_pins[] = { 10, 11, 12, 13 };
@@ -249,7 +249,7 @@ static const struct tsi_mux_opt tsi_ione_pwm_opts[] = {
 };
 
 /*
- * smb_iomode1 (0x170) selects SMB_ALERT vs GPIO with INVERTED polarity
+ * smb_iomode1 (TSI_SKYLP_IONE_SMB_IOMODE1) selects SMB_ALERT vs GPIO with INVERTED polarity
  * (0 = GPIO, 1 = SMB) relative to every other iomode register. It is
  * not modelled: the RAL gpio_data_out bit map has no SMB_ALERT pad, so
  * there is no line to expose. Do not copy the polarity of the groups
@@ -259,17 +259,17 @@ static const struct tsi_mux_opt tsi_ione_pwm_opts[] = {
 static const struct tsi_group tsi_ione_groups[] = {
 	TSI_GROUP_GPIO("gpio_fs", tsi_ione_gpio_fs_pins),
 	TSI_GROUP_MUX("smb", tsi_ione_smb_pins,
-		      0x16c, 0, 2, tsi_ione_smb_opts),
+		      TSI_SKYLP_IONE_SMB_IOMODE, 0, 2, tsi_ione_smb_opts),
 	TSI_GROUP_MUX("i3c", tsi_ione_i3c_pins,
-		      0x174, 0, 1, tsi_ione_i3c_opts),
+		      TSI_SKYLP_IONE_I3C_IOMODE, 0, 1, tsi_ione_i3c_opts),
 	TSI_GROUP_MUX("uart0", tsi_ione_uart0_pins,
-		      0x178, 0, 1, tsi_ione_uart_opts),
+		      TSI_SKYLP_IONE_UART_0_IOMODE, 0, 1, tsi_ione_uart_opts),
 	TSI_GROUP_MUX("uart1", tsi_ione_uart1_pins,
-		      0x17c, 0, 1, tsi_ione_uart_opts),
+		      TSI_SKYLP_IONE_UART_1_IOMODE, 0, 1, tsi_ione_uart_opts),
 	TSI_GROUP_MUX("led", tsi_ione_led_pins,
-		      0x180, 0, 1, tsi_ione_led_opts),
+		      TSI_SKYLP_IONE_LED_IOMODE, 0, 1, tsi_ione_led_opts),
 	TSI_GROUP_MUX("pwm", tsi_ione_pwm_pins,
-		      0x184, 0, 1, tsi_ione_pwm_opts),
+		      TSI_SKYLP_IONE_PWM_IOMODE, 0, 1, tsi_ione_pwm_opts),
 };
 
 VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_ione_soc = {
@@ -278,13 +278,13 @@ VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_ione_soc = {
 	.npins		= ARRAY_SIZE(tsi_ione_pins),
 	.groups		= tsi_ione_groups,
 	.ngroups	= ARRAY_SIZE(tsi_ione_groups),
-	.data_out_off	= 0x188,
-	.data_in_off	= 0x18c,
+	.data_out_off	= TSI_SKYLP_IONE_GPIO_DATA_OUT,
+	.data_in_off	= TSI_SKYLP_IONE_GPIO_DATA_IN,
 	/* intr_regs_8 collector: 25 gpio_intr sources, nothing else. */
-	.irq_w1c_off	= 0xc344,
-	.irq_glben_off	= 0xc34c,
-	.irq_grp0_ip_off = 0xc354,
-	.irq_grp0_en_off = 0xc358,
+	.irq_w1c_off	= TSI_SKYLP_IONE_INTR8_INTR_W1C,
+	.irq_glben_off	= TSI_SKYLP_IONE_INTR8_INTR_EN,
+	.irq_grp0_ip_off = TSI_SKYLP_IONE_INTR8_G0_IP,
+	.irq_grp0_en_off = TSI_SKYLP_IONE_INTR8_G0_EN,
 	.irq_bit_shift	= 0,
 };
 EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_ione_soc);
@@ -292,8 +292,8 @@ EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_ione_soc);
 /* ---------------- IOSE (CF801), corner base 0x9000000 ----------------- */
 
 static const struct tsi_pin tsi_iose_pins[] = {
-	TSI_PAD("TLQ_PERST_0",	0x120),
-	TSI_PAD("TLQ_PERST_1",	0x124),
+	TSI_PAD("TLQ_PERST_0",	TSI_SKYLP_IOSE_PRST0_CTRL),
+	TSI_PAD("TLQ_PERST_1",	TSI_SKYLP_IOSE_PRST1_CTRL),
 };
 
 static const unsigned int tsi_iose_perst_pins[] = { 0, 1 };
@@ -305,7 +305,7 @@ static const struct tsi_mux_opt tsi_iose_perst_opts[] = {
 
 static const struct tsi_group tsi_iose_groups[] = {
 	TSI_GROUP_MUX("perst", tsi_iose_perst_pins,
-		      0x130, 0, 2, tsi_iose_perst_opts),
+		      TSI_SKYLP_IOSE_PRST_IOMODE, 0, 2, tsi_iose_perst_opts),
 };
 
 VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_iose_soc = {
@@ -314,17 +314,17 @@ VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_iose_soc = {
 	.npins		= ARRAY_SIZE(tsi_iose_pins),
 	.groups		= tsi_iose_groups,
 	.ngroups	= ARRAY_SIZE(tsi_iose_groups),
-	.data_out_off	= 0x128,
-	.data_in_off	= 0x12c,
+	.data_out_off	= TSI_SKYLP_IOSE_GPIO_DATA_OUT,
+	.data_in_off	= TSI_SKYLP_IOSE_GPIO_DATA_IN,
 	/*
 	 * intr_regs collector: bit 0 is mdio_intr, so the two gpio_intr
 	 * sources are bits 1 and 2. Touching bit 0 here would disturb the
 	 * MDIO interrupt, hence the shift.
 	 */
-	.irq_w1c_off	= 0x2044,
-	.irq_glben_off	= 0x204c,
-	.irq_grp0_ip_off = 0x2054,
-	.irq_grp0_en_off = 0x2058,
+	.irq_w1c_off	= TSI_SKYLP_IOSE_INTR_INTR_W1C,
+	.irq_glben_off	= TSI_SKYLP_IOSE_INTR_INTR_EN,
+	.irq_grp0_ip_off = TSI_SKYLP_IOSE_INTR_G0_IP,
+	.irq_grp0_en_off = TSI_SKYLP_IOSE_INTR_G0_EN,
 	.irq_bit_shift	= 1,
 };
 EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_iose_soc);
@@ -332,18 +332,18 @@ EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_iose_soc);
 /* ---------------- IOSW (CF800), corner base 0x19000000 ---------------- */
 
 static const struct tsi_pin tsi_iosw_pins[] = {
-	TSI_PAD("I2C_I3C_SCL_0",	0x14c),
-	TSI_PAD("I2C_I3C_SDA_0",	0x150),
-	TSI_PAD("I2C_I3C_SCL_1",	0x154),
-	TSI_PAD("I2C_I3C_SDA_1",	0x158),
-	TSI_PAD("I2C_I3C_SCL_2",	0x15c),
-	TSI_PAD("I2C_I3C_SDA_2",	0x160),
-	TSI_PAD("I2S_SCK",		0x164),
-	TSI_PAD("I2S_WS",		0x16c),
-	TSI_PAD("I2S_SDI_0",		0x168),
-	TSI_PAD("I2S_SDO_0",		0x170),
-	TSI_PAD("I2S_SDO_1",		0x178),
-	TSI_PAD("I2S_SDI_1",		0x174),
+	TSI_PAD("I2C_I3C_SCL_0",	TSI_SKYLP_IOSW_I3C_SCL0_CTRL),
+	TSI_PAD("I2C_I3C_SDA_0",	TSI_SKYLP_IOSW_I3C_SDA0_CTRL),
+	TSI_PAD("I2C_I3C_SCL_1",	TSI_SKYLP_IOSW_I3C_SCL1_CTRL),
+	TSI_PAD("I2C_I3C_SDA_1",	TSI_SKYLP_IOSW_I3C_SDA1_CTRL),
+	TSI_PAD("I2C_I3C_SCL_2",	TSI_SKYLP_IOSW_I3C_SCL2_CTRL),
+	TSI_PAD("I2C_I3C_SDA_2",	TSI_SKYLP_IOSW_I3C_SDA2_CTRL),
+	TSI_PAD("I2S_SCK",		TSI_SKYLP_IOSW_I2S_SCK_CTRL),
+	TSI_PAD("I2S_WS",		TSI_SKYLP_IOSW_I2S_WS_CTRL),
+	TSI_PAD("I2S_SDI_0",		TSI_SKYLP_IOSW_I2S_SDI0_CTRL),
+	TSI_PAD("I2S_SDO_0",		TSI_SKYLP_IOSW_I2S_SDO0_CTRL),
+	TSI_PAD("I2S_SDO_1",		TSI_SKYLP_IOSW_I2S_SDO1_CTRL),
+	TSI_PAD("I2S_SDI_1",		TSI_SKYLP_IOSW_I2S_SDI1_CTRL),
 };
 
 static const unsigned int tsi_iosw_i3c_pins[] = { 0, 1, 2, 3, 4, 5 };
@@ -361,9 +361,9 @@ static const struct tsi_mux_opt tsi_iosw_i2s_opts[] = {
 
 static const struct tsi_group tsi_iosw_groups[] = {
 	TSI_GROUP_MUX("i3c", tsi_iosw_i3c_pins,
-		      0x180, 0, 1, tsi_iosw_i3c_opts),
+		      TSI_SKYLP_IOSW_I3C_IOMODE, 0, 1, tsi_iosw_i3c_opts),
 	TSI_GROUP_MUX("i2s", tsi_iosw_i2s_pins,
-		      0x17c, 0, 1, tsi_iosw_i2s_opts),
+		      TSI_SKYLP_IOSW_I2S_IOMODE, 0, 1, tsi_iosw_i2s_opts),
 };
 
 VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_iosw_soc = {
@@ -372,13 +372,13 @@ VISIBLE_IF_KUNIT const struct tsi_pinctrl_soc tsi_skylp_iosw_soc = {
 	.npins		= ARRAY_SIZE(tsi_iosw_pins),
 	.groups		= tsi_iosw_groups,
 	.ngroups	= ARRAY_SIZE(tsi_iosw_groups),
-	.data_out_off	= 0x184,
-	.data_in_off	= 0x188,
+	.data_out_off	= TSI_SKYLP_IOSW_GPIO_DATA_OUT,
+	.data_in_off	= TSI_SKYLP_IOSW_GPIO_DATA_IN,
 	/* intr_regs_2 collector: 12 gpio_intr sources, nothing else. */
-	.irq_w1c_off	= 0x90c4,
-	.irq_glben_off	= 0x90cc,
-	.irq_grp0_ip_off = 0x90d4,
-	.irq_grp0_en_off = 0x90d8,
+	.irq_w1c_off	= TSI_SKYLP_IOSW_INTR2_INTR_W1C,
+	.irq_glben_off	= TSI_SKYLP_IOSW_INTR2_INTR_EN,
+	.irq_grp0_ip_off = TSI_SKYLP_IOSW_INTR2_G0_IP,
+	.irq_grp0_en_off = TSI_SKYLP_IOSW_INTR2_G0_EN,
 	.irq_bit_shift	= 0,
 };
 EXPORT_SYMBOL_IF_KUNIT(tsi_skylp_iosw_soc);

@@ -81,6 +81,39 @@ struct tsi_corner_ref {
 	u32				base;
 };
 
+/*
+ * Pad control offsets and pin indices used by the table-integrity
+ * tests, as test-local literals from ral.json SKYLP_G0829. These are
+ * deliberately NOT the TSI_SKYLP_* header defines: the driver tables
+ * are built from that header, so asserting against it would only prove
+ * the driver equals itself. Keeping a second, independently transcribed
+ * copy here is what lets a bad header edit fail the suite.
+ */
+#define RAL_IONW_GPIO0_CTRL	0x11c
+#define RAL_IONW_GPIO4_CTRL	0x12c
+#define RAL_IONW_GPIO7_CTRL	0x138
+#define RAL_IONW_SPI_IO0_CTRL	0x144
+#define RAL_IONW_SPI_SCS_CTRL	0x13c
+#define RAL_IONW_PRST2_CTRL	0x10c
+#define RAL_IONE_I2C_SMB_SCL0_CTRL	0x134
+#define RAL_IONE_GPIO_FS0_CTRL	0x124
+#define RAL_IONE_GPIO_FS3_CTRL	0x130
+#define RAL_IONE_UART_RTS_1_CTRL	0x11c
+#define RAL_IONE_UART_CTS_1_CTRL	0x120
+#define RAL_IOSE_PRST0_CTRL	0x120
+#define RAL_IOSE_PRST1_CTRL	0x124
+#define RAL_IOSW_I3C_SCL0_CTRL	0x14c
+#define RAL_IOSW_I3C_SDA2_CTRL	0x160
+#define RAL_IOSW_I2S_SCK_CTRL	0x164
+#define RAL_IOSW_I2S_WS_CTRL	0x16c
+#define RAL_IOSW_I2S_SDI0_CTRL	0x168
+#define RAL_IOSW_I2S_SDO1_CTRL	0x178
+#define RAL_IOSW_I2S_SDI1_CTRL	0x174
+
+/* GPIO line (== data bit) of pads named in behavioural tests. */
+#define IONE_PIN_UART_RTS_1	14
+#define IONE_PIN_UART_RX_0	15
+
 /* iomode values that select GPIO, per RAL field descriptions. */
 #define IONW_SPI_GPIO		5
 #define IONW_PCIE_GPIO		1
@@ -332,19 +365,19 @@ static void tsi_ionw_pad_offsets(struct kunit *test)
 	const struct tsi_pinctrl_soc *s = &tsi_skylp_ionw_soc;
 
 	KUNIT_EXPECT_STREQ(test, s->pins[0].name, "GPIO_0");
-	KUNIT_EXPECT_EQ(test, s->pins[0].ctrl_off, 0x11cu);
+	KUNIT_EXPECT_EQ(test, s->pins[0].ctrl_off, RAL_IONW_GPIO0_CTRL);
 	KUNIT_EXPECT_STREQ(test, s->pins[21].name, "GPIO_4");
-	KUNIT_EXPECT_EQ(test, s->pins[21].ctrl_off, 0x12cu);
+	KUNIT_EXPECT_EQ(test, s->pins[21].ctrl_off, RAL_IONW_GPIO4_CTRL);
 	KUNIT_EXPECT_STREQ(test, s->pins[24].name, "GPIO_7");
-	KUNIT_EXPECT_EQ(test, s->pins[24].ctrl_off, 0x138u);
+	KUNIT_EXPECT_EQ(test, s->pins[24].ctrl_off, RAL_IONW_GPIO7_CTRL);
 	/* SPI block occupies bits 9..20, not 4..15. */
 	KUNIT_EXPECT_STREQ(test, s->pins[9].name, "SPI_IO0");
-	KUNIT_EXPECT_EQ(test, s->pins[9].ctrl_off, 0x144u);
+	KUNIT_EXPECT_EQ(test, s->pins[9].ctrl_off, RAL_IONW_SPI_IO0_CTRL);
 	KUNIT_EXPECT_STREQ(test, s->pins[20].name, "SPI_SCS");
-	KUNIT_EXPECT_EQ(test, s->pins[20].ctrl_off, 0x13cu);
+	KUNIT_EXPECT_EQ(test, s->pins[20].ctrl_off, RAL_IONW_SPI_SCS_CTRL);
 	/* PERST_2 is bit 25, above the GPIO_4..7 block. */
 	KUNIT_EXPECT_STREQ(test, s->pins[25].name, "TLP_PERST_2");
-	KUNIT_EXPECT_EQ(test, s->pins[25].ctrl_off, 0x10cu);
+	KUNIT_EXPECT_EQ(test, s->pins[25].ctrl_off, RAL_IONW_PRST2_CTRL);
 	KUNIT_EXPECT_EQ(test, s->data_out_off, 0x178u);
 	KUNIT_EXPECT_EQ(test, s->data_in_off, 0x17cu);
 }
@@ -355,16 +388,16 @@ static void tsi_ione_pad_offsets(struct kunit *test)
 	const struct tsi_pinctrl_soc *s = &tsi_skylp_ione_soc;
 
 	KUNIT_EXPECT_STREQ(test, s->pins[0].name, "I2C_SMB_SCL_0");
-	KUNIT_EXPECT_EQ(test, s->pins[0].ctrl_off, 0x134u);
+	KUNIT_EXPECT_EQ(test, s->pins[0].ctrl_off, RAL_IONE_I2C_SMB_SCL0_CTRL);
 	KUNIT_EXPECT_STREQ(test, s->pins[10].name, "GPIO_FS_0");
-	KUNIT_EXPECT_EQ(test, s->pins[10].ctrl_off, 0x124u);
+	KUNIT_EXPECT_EQ(test, s->pins[10].ctrl_off, RAL_IONE_GPIO_FS0_CTRL);
 	KUNIT_EXPECT_STREQ(test, s->pins[13].name, "GPIO_FS_3");
-	KUNIT_EXPECT_EQ(test, s->pins[13].ctrl_off, 0x130u);
+	KUNIT_EXPECT_EQ(test, s->pins[13].ctrl_off, RAL_IONE_GPIO_FS3_CTRL);
 	/* UART_RTS_1 is bit 14, split from the rest of UART1 (19,20,24). */
 	KUNIT_EXPECT_STREQ(test, s->pins[14].name, "UART_RTS_1");
-	KUNIT_EXPECT_EQ(test, s->pins[14].ctrl_off, 0x11cu);
+	KUNIT_EXPECT_EQ(test, s->pins[14].ctrl_off, RAL_IONE_UART_RTS_1_CTRL);
 	KUNIT_EXPECT_STREQ(test, s->pins[24].name, "UART_CTS_1");
-	KUNIT_EXPECT_EQ(test, s->pins[24].ctrl_off, 0x120u);
+	KUNIT_EXPECT_EQ(test, s->pins[24].ctrl_off, RAL_IONE_UART_CTS_1_CTRL);
 	KUNIT_EXPECT_EQ(test, s->data_out_off, 0x188u);
 }
 
@@ -570,8 +603,10 @@ static void tsi_uart_groups_are_independent(struct kunit *test)
 	struct fake_regs *f;
 	struct tsi_pinctrl *tp = fake_corner(test, &f, IONE_BASE,
 					     &tsi_skylp_ione_soc, CTRL_OE);
-	const struct tsi_group *u0 = tsi_pinctrl_group_of_pin(tp, 15);
-	const struct tsi_group *u1 = tsi_pinctrl_group_of_pin(tp, 14);
+	const struct tsi_group *u0 = tsi_pinctrl_group_of_pin(tp,
+							IONE_PIN_UART_RX_0);
+	const struct tsi_group *u1 =
+		tsi_pinctrl_group_of_pin(tp, IONE_PIN_UART_RTS_1);
 
 	KUNIT_ASSERT_NOT_NULL(test, u0);
 	KUNIT_ASSERT_NOT_NULL(test, u1);
@@ -580,7 +615,8 @@ static void tsi_uart_groups_are_independent(struct kunit *test)
 	KUNIT_EXPECT_STREQ(test, u1->name, "uart1");
 
 	/* Moving UART0 to GPIO must leave UART1's register alone. */
-	KUNIT_EXPECT_EQ(test, tsi_pinctrl_gpio_enable(tp, 15), 0);
+	KUNIT_EXPECT_EQ(test, tsi_pinctrl_gpio_enable(tp, IONE_PIN_UART_RX_0),
+			0);
 	KUNIT_EXPECT_EQ(test, fake_get(f, IONE_UART0_IOMODE), IONE_UART_GPIO);
 	KUNIT_EXPECT_EQ(test, fake_get(f, IONE_BASE + 0x17c), 0u);
 }
@@ -1598,28 +1634,28 @@ static void tsi_iose_iosw_pad_offsets(struct kunit *test)
 	const struct tsi_pinctrl_soc *w = &tsi_skylp_iosw_soc;
 
 	KUNIT_EXPECT_STREQ(test, e->pins[0].name, "TLQ_PERST_0");
-	KUNIT_EXPECT_EQ(test, e->pins[0].ctrl_off, 0x120u);
+	KUNIT_EXPECT_EQ(test, e->pins[0].ctrl_off, RAL_IOSE_PRST0_CTRL);
 	KUNIT_EXPECT_STREQ(test, e->pins[1].name, "TLQ_PERST_1");
-	KUNIT_EXPECT_EQ(test, e->pins[1].ctrl_off, 0x124u);
+	KUNIT_EXPECT_EQ(test, e->pins[1].ctrl_off, RAL_IOSE_PRST1_CTRL);
 	KUNIT_EXPECT_EQ(test, e->data_out_off, 0x128u);
 	KUNIT_EXPECT_EQ(test, e->data_in_off, 0x12cu);
 
 	/* I3C occupies 0..5, I2S 6..11 - and SDI/SDO are interleaved. */
 	KUNIT_EXPECT_STREQ(test, w->pins[0].name, "I2C_I3C_SCL_0");
-	KUNIT_EXPECT_EQ(test, w->pins[0].ctrl_off, 0x14cu);
+	KUNIT_EXPECT_EQ(test, w->pins[0].ctrl_off, RAL_IOSW_I3C_SCL0_CTRL);
 	KUNIT_EXPECT_STREQ(test, w->pins[5].name, "I2C_I3C_SDA_2");
-	KUNIT_EXPECT_EQ(test, w->pins[5].ctrl_off, 0x160u);
+	KUNIT_EXPECT_EQ(test, w->pins[5].ctrl_off, RAL_IOSW_I3C_SDA2_CTRL);
 	KUNIT_EXPECT_STREQ(test, w->pins[6].name, "I2S_SCK");
-	KUNIT_EXPECT_EQ(test, w->pins[6].ctrl_off, 0x164u);
+	KUNIT_EXPECT_EQ(test, w->pins[6].ctrl_off, RAL_IOSW_I2S_SCK_CTRL);
 	/* WS is +0x16c while SDI_0 is +0x168 - not pad order */
 	KUNIT_EXPECT_STREQ(test, w->pins[7].name, "I2S_WS");
-	KUNIT_EXPECT_EQ(test, w->pins[7].ctrl_off, 0x16cu);
+	KUNIT_EXPECT_EQ(test, w->pins[7].ctrl_off, RAL_IOSW_I2S_WS_CTRL);
 	KUNIT_EXPECT_STREQ(test, w->pins[8].name, "I2S_SDI_0");
-	KUNIT_EXPECT_EQ(test, w->pins[8].ctrl_off, 0x168u);
+	KUNIT_EXPECT_EQ(test, w->pins[8].ctrl_off, RAL_IOSW_I2S_SDI0_CTRL);
 	KUNIT_EXPECT_STREQ(test, w->pins[10].name, "I2S_SDO_1");
-	KUNIT_EXPECT_EQ(test, w->pins[10].ctrl_off, 0x178u);
+	KUNIT_EXPECT_EQ(test, w->pins[10].ctrl_off, RAL_IOSW_I2S_SDO1_CTRL);
 	KUNIT_EXPECT_STREQ(test, w->pins[11].name, "I2S_SDI_1");
-	KUNIT_EXPECT_EQ(test, w->pins[11].ctrl_off, 0x174u);
+	KUNIT_EXPECT_EQ(test, w->pins[11].ctrl_off, RAL_IOSW_I2S_SDI1_CTRL);
 	KUNIT_EXPECT_EQ(test, w->data_out_off, 0x184u);
 	KUNIT_EXPECT_EQ(test, w->data_in_off, 0x188u);
 }
