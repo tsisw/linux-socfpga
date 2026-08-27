@@ -1,0 +1,162 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * SkyLP chiplet register map - pinctrl/GPIO subset, all four IO corners.
+ *
+ * GENERATED from ral.json, release SKYLP_G0829. Do not hand-edit;
+ * regenerate with the RAL header generator (tsi-drivers staging,
+ * work item 1.3). Offsets under TSI_SKYLP_<corner>_* are corner-block
+ * relative; the corner's own base inside the chiplet CSR window is
+ * NOT defined here - it comes from the devicetree child node's "reg",
+ * which pinctrl-tsi reads and validates at probe.
+ *
+ * Copyright (c) 2026 Tsavorite Scalable Intelligence
+ */
+
+#ifndef __LINUX_SOC_TSI_SKYLP_REGS_H
+#define __LINUX_SOC_TSI_SKYLP_REGS_H
+
+#include <linux/bits.h>
+
+/* <pad>_control, field control[8:0] (same layout on every pad) */
+#define TSI_SKYLP_GPIO_CTRL_DS		GENMASK(2, 0)
+#define TSI_SKYLP_GPIO_CTRL_OE		BIT(3)
+#define TSI_SKYLP_GPIO_CTRL_IE		BIT(4)
+#define TSI_SKYLP_GPIO_CTRL_IS		BIT(5)
+#define TSI_SKYLP_GPIO_CTRL_PE		BIT(6)
+#define TSI_SKYLP_GPIO_CTRL_POE		BIT(7)
+#define TSI_SKYLP_GPIO_CTRL_PS		BIT(8)
+
+/*
+ * Interrupt collector layout note: every corner has one GPIO-carrying
+ * collector (per-source R/W1C latched) whose group-N ip_status/enable
+ * registers repeat every TSI_SKYLP_INTR_GRP_STRIDE bytes for the four
+ * destination groups g0..g3. pinctrl-tsi arms it only when a DT node
+ * declares "interrupts": the group-to-GIC wiring, SPI INTID, and
+ * polarity are not in the CSR spec (open items A/B/C).
+ */
+#define TSI_SKYLP_INTR_GRP_STRIDE	0xc
+
+/* ---- IONW corner (CF802), ionw_mgtclk_regs; offsets corner-relative */
+#define TSI_SKYLP_IONW_PRST0_CTRL	0x104
+#define TSI_SKYLP_IONW_PRST1_CTRL	0x108
+#define TSI_SKYLP_IONW_PRST2_CTRL	0x10c
+#define TSI_SKYLP_IONW_PRST3_CTRL	0x110
+#define TSI_SKYLP_IONW_PWAKE_CTRL	0x114
+#define TSI_SKYLP_IONW_PCLKREQ_CTRL	0x118
+#define TSI_SKYLP_IONW_GPIO0_CTRL	0x11c
+#define TSI_SKYLP_IONW_GPIO1_CTRL	0x120
+#define TSI_SKYLP_IONW_GPIO2_CTRL	0x124
+#define TSI_SKYLP_IONW_GPIO3_CTRL	0x128
+#define TSI_SKYLP_IONW_GPIO4_CTRL	0x12c
+#define TSI_SKYLP_IONW_GPIO5_CTRL	0x130
+#define TSI_SKYLP_IONW_GPIO6_CTRL	0x134
+#define TSI_SKYLP_IONW_GPIO7_CTRL	0x138
+#define TSI_SKYLP_IONW_SPI_SCS_CTRL	0x13c
+#define TSI_SKYLP_IONW_SPI_SCLK_CTRL	0x140
+#define TSI_SKYLP_IONW_SPI_IO0_CTRL	0x144
+#define TSI_SKYLP_IONW_SPI_IO1_CTRL	0x148
+#define TSI_SKYLP_IONW_SPI_IO2_CTRL	0x14c
+#define TSI_SKYLP_IONW_SPI_IO3_CTRL	0x150
+#define TSI_SKYLP_IONW_SPI_IO4_CTRL	0x154
+#define TSI_SKYLP_IONW_SPI_IO5_CTRL	0x158
+#define TSI_SKYLP_IONW_SPI_IO6_CTRL	0x15c
+#define TSI_SKYLP_IONW_SPI_IO7_CTRL	0x160
+#define TSI_SKYLP_IONW_SPI_IO8_CTRL	0x164
+#define TSI_SKYLP_IONW_SPI_IO9_CTRL	0x168
+#define TSI_SKYLP_IONW_GPIO_DATA_OUT	0x178
+#define TSI_SKYLP_IONW_GPIO_DATA_IN	0x17c
+#define TSI_SKYLP_IONW_PRST_IOMODE	0x180
+#define TSI_SKYLP_IONW_PRST_IOMODE_1	0x184
+#define TSI_SKYLP_IONW_PCIE_IOMODE	0x188
+#define TSI_SKYLP_IONW_SPI_IOMODE	0x18c
+#define TSI_SKYLP_IONW_T2_INTR		0x34c0
+#define TSI_SKYLP_IONW_T2_INTR_W1C	0x34c4
+#define TSI_SKYLP_IONW_T2_INTR_W1S	0x34c8
+#define TSI_SKYLP_IONW_T2_INTR_EN	0x34cc
+#define TSI_SKYLP_IONW_T2_G0_STATUS	0x34d0
+#define TSI_SKYLP_IONW_T2_G0_IP		0x34d4
+#define TSI_SKYLP_IONW_T2_G0_EN		0x34d8
+
+/* ---- IONE corner (CF803), ione_mgtclk_regs; offsets corner-relative */
+#define TSI_SKYLP_IONE_UART_RX_0_CTRL	0x104
+#define TSI_SKYLP_IONE_UART_CTS_0_CTRL	0x108
+#define TSI_SKYLP_IONE_UART_TX_0_CTRL	0x10c
+#define TSI_SKYLP_IONE_UART_RTS_0_CTRL	0x110
+#define TSI_SKYLP_IONE_UART_RX_1_CTRL	0x114
+#define TSI_SKYLP_IONE_UART_TX_1_CTRL	0x118
+#define TSI_SKYLP_IONE_UART_RTS_1_CTRL	0x11c
+#define TSI_SKYLP_IONE_UART_CTS_1_CTRL	0x120
+#define TSI_SKYLP_IONE_GPIO_FS0_CTRL	0x124
+#define TSI_SKYLP_IONE_GPIO_FS1_CTRL	0x128
+#define TSI_SKYLP_IONE_GPIO_FS2_CTRL	0x12c
+#define TSI_SKYLP_IONE_GPIO_FS3_CTRL	0x130
+#define TSI_SKYLP_IONE_I2C_SMB_SCL0_CTRL	0x134
+#define TSI_SKYLP_IONE_I2C_SMB_SDA0_CTRL	0x138
+#define TSI_SKYLP_IONE_I2C_SMB_SCL1_CTRL	0x13c
+#define TSI_SKYLP_IONE_I2C_SMB_SDA1_CTRL	0x140
+#define TSI_SKYLP_IONE_I2C_SMB_SCL2_CTRL	0x144
+#define TSI_SKYLP_IONE_I2C_SMB_SDA2_CTRL	0x148
+#define TSI_SKYLP_IONE_I2C_SMB_SCL3_CTRL	0x14c
+#define TSI_SKYLP_IONE_I2C_SMB_SDA3_CTRL	0x150
+#define TSI_SKYLP_IONE_I3C_SCL3_CTRL	0x154
+#define TSI_SKYLP_IONE_I3C_SDA3_CTRL	0x158
+#define TSI_SKYLP_IONE_LED_0_CTRL	0x15c
+#define TSI_SKYLP_IONE_LED_1_CTRL	0x160
+#define TSI_SKYLP_IONE_FAN_PWM_CTRL	0x164
+#define TSI_SKYLP_IONE_SMB_IOMODE	0x16c
+#define TSI_SKYLP_IONE_SMB_IOMODE1	0x170
+#define TSI_SKYLP_IONE_I3C_IOMODE	0x174
+#define TSI_SKYLP_IONE_UART_0_IOMODE	0x178
+#define TSI_SKYLP_IONE_UART_1_IOMODE	0x17c
+#define TSI_SKYLP_IONE_LED_IOMODE	0x180
+#define TSI_SKYLP_IONE_PWM_IOMODE	0x184
+#define TSI_SKYLP_IONE_GPIO_DATA_OUT	0x188
+#define TSI_SKYLP_IONE_GPIO_DATA_IN	0x18c
+#define TSI_SKYLP_IONE_INTR8_INTR	0xc340
+#define TSI_SKYLP_IONE_INTR8_INTR_W1C	0xc344
+#define TSI_SKYLP_IONE_INTR8_INTR_W1S	0xc348
+#define TSI_SKYLP_IONE_INTR8_INTR_EN	0xc34c
+#define TSI_SKYLP_IONE_INTR8_G0_STATUS	0xc350
+#define TSI_SKYLP_IONE_INTR8_G0_IP	0xc354
+#define TSI_SKYLP_IONE_INTR8_G0_EN	0xc358
+
+/* ---- IOSE corner (CF801), iose_mgtclk_regs; offsets corner-relative */
+#define TSI_SKYLP_IOSE_PRST0_CTRL	0x120
+#define TSI_SKYLP_IOSE_PRST1_CTRL	0x124
+#define TSI_SKYLP_IOSE_GPIO_DATA_OUT	0x128
+#define TSI_SKYLP_IOSE_GPIO_DATA_IN	0x12c
+#define TSI_SKYLP_IOSE_PRST_IOMODE	0x130
+#define TSI_SKYLP_IOSE_INTR_INTR	0x2040
+#define TSI_SKYLP_IOSE_INTR_INTR_W1C	0x2044
+#define TSI_SKYLP_IOSE_INTR_INTR_W1S	0x2048
+#define TSI_SKYLP_IOSE_INTR_INTR_EN	0x204c
+#define TSI_SKYLP_IOSE_INTR_G0_STATUS	0x2050
+#define TSI_SKYLP_IOSE_INTR_G0_IP	0x2054
+#define TSI_SKYLP_IOSE_INTR_G0_EN	0x2058
+
+/* ---- IOSW corner (CF800), iosw_mgtclk_regs; offsets corner-relative */
+#define TSI_SKYLP_IOSW_I3C_SCL0_CTRL	0x14c
+#define TSI_SKYLP_IOSW_I3C_SDA0_CTRL	0x150
+#define TSI_SKYLP_IOSW_I3C_SCL1_CTRL	0x154
+#define TSI_SKYLP_IOSW_I3C_SDA1_CTRL	0x158
+#define TSI_SKYLP_IOSW_I3C_SCL2_CTRL	0x15c
+#define TSI_SKYLP_IOSW_I3C_SDA2_CTRL	0x160
+#define TSI_SKYLP_IOSW_I2S_SCK_CTRL	0x164
+#define TSI_SKYLP_IOSW_I2S_SDI0_CTRL	0x168
+#define TSI_SKYLP_IOSW_I2S_WS_CTRL	0x16c
+#define TSI_SKYLP_IOSW_I2S_SDO0_CTRL	0x170
+#define TSI_SKYLP_IOSW_I2S_SDI1_CTRL	0x174
+#define TSI_SKYLP_IOSW_I2S_SDO1_CTRL	0x178
+#define TSI_SKYLP_IOSW_I2S_IOMODE	0x17c
+#define TSI_SKYLP_IOSW_I3C_IOMODE	0x180
+#define TSI_SKYLP_IOSW_GPIO_DATA_OUT	0x184
+#define TSI_SKYLP_IOSW_GPIO_DATA_IN	0x188
+#define TSI_SKYLP_IOSW_INTR2_INTR	0x90c0
+#define TSI_SKYLP_IOSW_INTR2_INTR_W1C	0x90c4
+#define TSI_SKYLP_IOSW_INTR2_INTR_W1S	0x90c8
+#define TSI_SKYLP_IOSW_INTR2_INTR_EN	0x90cc
+#define TSI_SKYLP_IOSW_INTR2_G0_STATUS	0x90d0
+#define TSI_SKYLP_IOSW_INTR2_G0_IP	0x90d4
+#define TSI_SKYLP_IOSW_INTR2_G0_EN	0x90d8
+
+#endif /* __LINUX_SOC_TSI_SKYLP_REGS_H */

@@ -1543,6 +1543,8 @@ patternProperties:
     description: Truly Semiconductors Limited
   "^tsd,.*":
     description: Theobroma Systems Design und Consulting GmbH
+  "^tsi,.*":
+    description: Tsavorite Scalable Intelligence, Inc.
   "^turing,.*":
     description: Turing Machines, Inc.
   "^tyan,.*":

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+menu "TSI SoC drivers"
+	depends on ARCH_TSI || COMPILE_TEST
+
+config TSI_CHIPLET
+	tristate "TSI chiplet CSR window core"
+	depends on OF
+	select REGMAP_MMIO
+	help
+	  Core driver for the TSI chiplet CSR window. Maps the window,
+	  provides a regmap and poll helpers, and probes the IP blocks
+	  (gpio, pvt, mbox, i2c, wdt) declared as DT children. All TSI IP
+	  drivers depend on it.
+
+endmenu
