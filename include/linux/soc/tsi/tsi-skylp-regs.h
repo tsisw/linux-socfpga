@@ -4,11 +4,10 @@
  *
  * GENERATED from ral.json, release SKYLP_G0829. Do not hand-edit;
  * regenerate with the RAL header generator (tsi-drivers staging,
- * work item 1.3). Offsets under TSI_SKYLP_<corner>_* are relative to
- * the chiplet CSR window, which maps SkyLP CSR space starting at
- * 0x2000_0000 (window offset = RAL address - 0x2000_0000); the *_BASE
- * values are the corner block bases inside that window, matching the
- * "reg" offset a devicetree child node declares.
+ * work item 1.3). Offsets under TSI_SKYLP_<corner>_* are corner-block
+ * relative; the corner's own base inside the chiplet CSR window is
+ * NOT defined here - it comes from the devicetree child node's "reg",
+ * which pinctrl-tsi reads and validates at probe.
  *
  * Copyright (c) 2026 Tsavorite Scalable Intelligence
  */
@@ -38,7 +37,6 @@
 #define TSI_SKYLP_INTR_GRP_STRIDE	0xc
 
 /* ---- IONW corner (CF802), ionw_mgtclk_regs; offsets corner-relative */
-#define TSI_SKYLP_IONW_BASE		0x13000000
 #define TSI_SKYLP_IONW_PRST0_CTRL	0x104
 #define TSI_SKYLP_IONW_PRST1_CTRL	0x108
 #define TSI_SKYLP_IONW_PRST2_CTRL	0x10c
@@ -79,18 +77,7 @@
 #define TSI_SKYLP_IONW_T2_G0_IP		0x34d4
 #define TSI_SKYLP_IONW_T2_G0_EN		0x34d8
 
-/* data_out/data_in bit of the dedicated GPIO pads (bit == GPIO line) */
-#define TSI_SKYLP_IONW_GPIO0_BIT		0x0
-#define TSI_SKYLP_IONW_GPIO1_BIT		0x1
-#define TSI_SKYLP_IONW_GPIO2_BIT		0x2
-#define TSI_SKYLP_IONW_GPIO3_BIT		0x3
-#define TSI_SKYLP_IONW_GPIO4_BIT		0x15
-#define TSI_SKYLP_IONW_GPIO5_BIT		0x16
-#define TSI_SKYLP_IONW_GPIO6_BIT		0x17
-#define TSI_SKYLP_IONW_GPIO7_BIT		0x18
-
 /* ---- IONE corner (CF803), ione_mgtclk_regs; offsets corner-relative */
-#define TSI_SKYLP_IONE_BASE		0x6000000
 #define TSI_SKYLP_IONE_UART_RX_0_CTRL	0x104
 #define TSI_SKYLP_IONE_UART_CTS_0_CTRL	0x108
 #define TSI_SKYLP_IONE_UART_TX_0_CTRL	0x10c
@@ -133,14 +120,7 @@
 #define TSI_SKYLP_IONE_INTR8_G0_IP	0xc354
 #define TSI_SKYLP_IONE_INTR8_G0_EN	0xc358
 
-/* data_out/data_in bit of the dedicated fail-safe pads */
-#define TSI_SKYLP_IONE_GPIO_FS0_BIT	0xa
-#define TSI_SKYLP_IONE_GPIO_FS1_BIT	0xb
-#define TSI_SKYLP_IONE_GPIO_FS2_BIT	0xc
-#define TSI_SKYLP_IONE_GPIO_FS3_BIT	0xd
-
 /* ---- IOSE corner (CF801), iose_mgtclk_regs; offsets corner-relative */
-#define TSI_SKYLP_IOSE_BASE		0x9000000
 #define TSI_SKYLP_IOSE_PRST0_CTRL	0x120
 #define TSI_SKYLP_IOSE_PRST1_CTRL	0x124
 #define TSI_SKYLP_IOSE_GPIO_DATA_OUT	0x128
@@ -155,7 +135,6 @@
 #define TSI_SKYLP_IOSE_INTR_G0_EN	0x2058
 
 /* ---- IOSW corner (CF800), iosw_mgtclk_regs; offsets corner-relative */
-#define TSI_SKYLP_IOSW_BASE		0x19000000
 #define TSI_SKYLP_IOSW_I3C_SCL0_CTRL	0x14c
 #define TSI_SKYLP_IOSW_I3C_SDA0_CTRL	0x150
 #define TSI_SKYLP_IOSW_I3C_SCL1_CTRL	0x154
