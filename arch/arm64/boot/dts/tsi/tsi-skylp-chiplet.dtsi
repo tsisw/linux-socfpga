@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+/*
+ * TSI SkyLP chiplet CSR window + IO-corner pinctrl/GPIO nodes.
+ *
+ * RAL-sourced description of one SkyLP chiplet: the chiplet CSR window and
+ * its four IO corners (IONW/IONE/IOSE/IOSW), each a combined pinctrl + GPIO
+ * controller. Addresses are corner-relative offsets inside the chiplet CSR
+ * window; window base/stride come from the platform (node_layout / RAL).
+ *
+ * This is a DT fragment, not a standalone board: on the TSISIM functional
+ * simulator the base platform (CPUs, GIC, PL011, virtio, PCI) is provided by
+ * the QEMU tsi-fpga machine, and this chiplet node is spliced onto that base
+ * (see tsi_yocto scripts/build_bmc_kernel.sh). Chiplet base 0x20_40000000,
+ * window size 0x1c000000 correspond to node_layout device "dev" / chiplet 0.
+ *
+ * No "interrupts" property: the SkyLP interrupt-collector -> A520 GIC SPI
+ * wiring is not yet confirmed against the SoC interrupt map, so the pinctrl
+ * driver runs GPIO in polled mode (no irqchip) until it is. Do not add
+ * interrupts here before that is resolved.
+ *
+ * Corner offsets/sizes are from the pinctrl-tsi driver's per-corner tables
+ * (drivers/pinctrl/tsi/pinctrl-tsi.c) and the binding minimum window sizes
+ * (Documentation/devicetree/bindings/pinctrl/tsi,skylp-pinctrl.yaml).
+ */
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	tsi_chiplet0: chiplet@2040000000 {
+		compatible = "tsi,skylp-chiplet";
+		reg = <0x20 0x40000000 0x0 0x1c000000>;
+		tsi,chiplet-id = <0>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x20 0x40000000 0x1c000000>;
+
+		pinctrl@13000000 {
+			compatible = "tsi,skylp-ionw-pinctrl";
+			reg = <0x13000000 0x3500>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
+		pinctrl@6000000 {
+			compatible = "tsi,skylp-ione-pinctrl";
+			reg = <0x06000000 0xc380>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
+		pinctrl@9000000 {
+			compatible = "tsi,skylp-iose-pinctrl";
+			reg = <0x09000000 0x2080>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
+		pinctrl@19000000 {
+			compatible = "tsi,skylp-iosw-pinctrl";
+			reg = <0x19000000 0x9100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+	};
+};

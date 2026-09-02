@@ -1,0 +1,9 @@
+TSI device tree sources
+=======================
+
+tsi-skylp-chiplet.dtsi
+    SkyLP chiplet CSR window + IO-corner pinctrl/GPIO nodes (RAL-sourced).
+    A fragment, not a standalone board: it is spliced onto the QEMU tsi-fpga
+    machine's synthesized base DTB by the TSISIM deployment
+    (tsi_yocto scripts/build_bmc_kernel.sh), which dtc-recompiles the result.
+    Requires CONFIG_ARCH_TSI + CONFIG_TSI_CHIPLET + CONFIG_PINCTRL_TSI.
