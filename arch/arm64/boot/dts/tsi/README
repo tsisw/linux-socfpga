@@ -7,3 +7,46 @@ tsi-skylp-chiplet.dtsi
     machine's synthesized base DTB by the TSISIM deployment
     (tsi_yocto scripts/build_bmc_kernel.sh), which dtc-recompiles the result.
     Requires CONFIG_ARCH_TSI + CONFIG_TSI_CHIPLET + CONFIG_PINCTRL_TSI.
+
+
+Verifying the TSI chiplet / pinctrl / GPIO enablement
+=====================================================
+
+Enabling ARCH_TSI + TSI_CHIPLET + PINCTRL_TSI in the arm64 defconfig and
+adding the chiplet nodes above is validated two ways, both reproducible.
+
+1. Driver unit tests (KUnit, host-only, no hardware/simulator)
+
+   The pinctrl/GPIO driver ships a KUnit suite that checks pad-to-data-bit
+   mapping, iomode/mux encodings, group-wide muxing, direction and pinconf
+   encoding, register-span coverage, and per-corner registration against a
+   fake register model:
+
+       ./tools/testing/kunit/kunit.py run \
+           --kunitconfig drivers/pinctrl/tsi/pinctrl-tsi.kunitconfig
+
+   Expected: "Ran 52 tests: passed: 52" (suite pinctrl-tsi).
+
+   Note: on a host GCC newer than this tree expects, the ARCH=um build may
+   trip -Werror=missing-prototypes in unrelated lib/ code; append
+   "--kconfig_add CONFIG_WERROR=n" to build the tests in that case.
+
+2. Simulator boot probe (TSISIM functional simulator + vFlex)
+
+   Build and boot the BMC-on-TSISIM environment (see tsi_yocto
+   docs/build-flavors.md, flavor bmc-tsisim), then on the guest:
+
+       # dmesg
+       tsi-chiplet 2040000000.chiplet: chiplet 0: CSR window [mem 0x2040000000-0x205bffffff]
+
+       # gpiodetect
+       gpiochip0 [2053000000.pinctrl] (26 lines)   # IONW (chiplet base + 0x13000000)
+       gpiochip1 [2046000000.pinctrl] (25 lines)   # IONE (chiplet base + 0x06000000)
+       gpiochip2 [2049000000.pinctrl] (2 lines)    # IOSE (chiplet base + 0x09000000)
+       gpiochip3 [2059000000.pinctrl] (12 lines)   # IOSW (chiplet base + 0x19000000)
+
+   Before this change: driver not compiled in, /dev/gpiochip* absent.
+   After: tsi-chiplet probes and four gpiochips enumerate, one per corner.
+
+   GPIO runs in polled mode (no "interrupts" in the DT) until the
+   collector-to-GIC SPI wiring is confirmed; see the pinctrl binding.
