@@ -794,7 +794,7 @@ static int tsi_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
 {
 	struct tsi_pinctrl *tp = pinctrl_dev_get_drvdata(pctldev);
 	unsigned long param = pinconf_to_config_param(*config);
-	u32 ctrl, arg, i;
+	u32 ctrl, val, arg, i;
 	int ret;
 
 	ret = regmap_read(tp->regmap, tsi_ctrl_reg(tp, pin), &ctrl);
@@ -841,6 +841,19 @@ static int tsi_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
 	case PIN_CONFIG_INPUT_ENABLE:
 		arg = !!(ctrl & TSI_SKYLP_GPIO_CTRL_IE);
 		break;
+	case PIN_CONFIG_OUTPUT:
+		/*
+		 * A query, like the bias parameters: only a pad that is
+		 * actually driving has an output level to report.
+		 */
+		if (!(ctrl & TSI_SKYLP_GPIO_CTRL_OE))
+			return -EINVAL;
+		ret = regmap_read(tp->regmap,
+				  tp->base + tp->soc->data_out_off, &val);
+		if (ret)
+			return ret;
+		arg = !!(val & BIT(pin));
+		break;
 	default:
 		return -ENOTSUPP;
 	}
@@ -864,6 +877,7 @@ static int tsi_pinconf_set_one(struct tsi_pinctrl *tp, unsigned int pin,
 	u32 arg = pinconf_to_config_argument(config);
 	u32 mask, val;
 	unsigned int i;
+	int ret;
 
 	switch (param) {
 	case PIN_CONFIG_BIAS_PULL_UP:
@@ -898,6 +912,22 @@ static int tsi_pinconf_set_one(struct tsi_pinctrl *tp, unsigned int pin,
 	case PIN_CONFIG_INPUT_ENABLE:
 		mask = TSI_SKYLP_GPIO_CTRL_OE | TSI_SKYLP_GPIO_CTRL_IE;
 		val = arg ? TSI_SKYLP_GPIO_CTRL_IE : TSI_SKYLP_GPIO_CTRL_OE;
+		break;
+	case PIN_CONFIG_OUTPUT:
+		/*
+		 * Drive the pad to a defined level - what a DT hog's
+		 * output-high/output-low becomes. Two writes, in the same
+		 * order direction_output() uses: latch the level in
+		 * data_out first, then raise OE, so the pad never briefly
+		 * drives whatever stale level data_out last held.
+		 */
+		ret = regmap_update_bits(tp->regmap,
+					 tp->base + tp->soc->data_out_off,
+					 BIT(pin), arg ? BIT(pin) : 0);
+		if (ret)
+			return ret;
+		mask = TSI_SKYLP_GPIO_CTRL_OE | TSI_SKYLP_GPIO_CTRL_IE;
+		val = TSI_SKYLP_GPIO_CTRL_OE;
 		break;
 	default:
 		return -ENOTSUPP;
@@ -1092,8 +1122,7 @@ static void tsi_irq_ack(struct irq_data *d)
  * exactly a supported level type is rejected rather than silently
  * accepted, so a mixed edge+level request cannot look like success.
  */
-VISIBLE_IF_KUNIT int tsi_pinctrl_irq_set_type(struct irq_data *d,
-					      unsigned int type)
+VISIBLE_IF_KUNIT int tsi_pinctrl_irq_type_valid(unsigned int type)
 {
 	switch (type) {
 	case IRQ_TYPE_LEVEL_HIGH:
@@ -1103,14 +1132,32 @@ VISIBLE_IF_KUNIT int tsi_pinctrl_irq_set_type(struct irq_data *d,
 		return -EINVAL;
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(tsi_pinctrl_irq_set_type);
+EXPORT_SYMBOL_IF_KUNIT(tsi_pinctrl_irq_type_valid);
+
+/*
+ * Lines start on handle_bad_irq (see the girq wiring in
+ * tsi_pinctrl_register), so a line whose trigger was never configured
+ * complains loudly instead of being silently serviced as level. The
+ * real flow handler is only installed here, once a supported type has
+ * been requested.
+ */
+static int tsi_irq_set_type(struct irq_data *d, unsigned int type)
+{
+	int ret = tsi_pinctrl_irq_type_valid(type);
+
+	if (ret)
+		return ret;
+
+	irq_set_handler_locked(d, handle_level_irq);
+	return 0;
+}
 
 static const struct irq_chip tsi_irq_chip = {
 	.name		= "tsi-pinctrl",
 	.irq_mask	= tsi_irq_mask,
 	.irq_unmask	= tsi_irq_unmask,
 	.irq_ack	= tsi_irq_ack,
-	.irq_set_type	= tsi_pinctrl_irq_set_type,
+	.irq_set_type	= tsi_irq_set_type,
 	.flags		= IRQCHIP_IMMUTABLE | IRQCHIP_MASK_ON_SUSPEND,
 	GPIOCHIP_IRQ_RESOURCE_HELPERS,
 };
@@ -1479,7 +1526,12 @@ VISIBLE_IF_KUNIT struct tsi_pinctrl *tsi_pinctrl_register(struct device *dev,
 			return ERR_PTR(-ENOMEM);
 		girq->parents[0] = irq;
 		girq->default_type = IRQ_TYPE_NONE;
-		girq->handler = handle_level_irq;
+		/*
+		 * handle_bad_irq until irq_set_type() installs the level
+		 * handler: a line that fires without a configured trigger
+		 * is a wiring bug and should be reported as one.
+		 */
+		girq->handler = handle_bad_irq;
 	}
 
 	ret = devm_gpiochip_add_data(dev, &tp->chip, tp);
