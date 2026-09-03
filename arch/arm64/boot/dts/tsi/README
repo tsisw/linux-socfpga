@@ -28,8 +28,13 @@ adding the chiplet nodes above is validated two ways, both reproducible.
    Expected: "Ran 52 tests: passed: 52" (suite pinctrl-tsi).
 
    Note: on a host GCC newer than this tree expects, the ARCH=um build may
-   trip -Werror=missing-prototypes in unrelated lib/ code; append
-   "--kconfig_add CONFIG_WERROR=n" to build the tests in that case.
+   trip -Werror=missing-prototypes in unrelated lib/ code. In that case run
+   the full command with WERROR disabled (--kconfig_add and its value are
+   two separate arguments):
+
+       ./tools/testing/kunit/kunit.py run \
+           --kunitconfig drivers/pinctrl/tsi/pinctrl-tsi.kunitconfig \
+           --kconfig_add CONFIG_WERROR=n
 
 2. Simulator boot probe (TSISIM functional simulator + vFlex)
 
