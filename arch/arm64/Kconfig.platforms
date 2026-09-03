@@ -362,6 +362,14 @@ config ARCH_THUNDER2
 	  This enables support for Cavium's ThunderX2 CN99XX family of
 	  server processors.
 
+config ARCH_TSI
+	bool "Tsavorite Scalable Intelligence SoC Family"
+	select PINCTRL
+	help
+	  This enables support for the Tsavorite Scalable Intelligence (TSI)
+	  SkyLP-based SoCs. It gates the TSI chiplet CSR core and the
+	  IO-corner pinctrl/GPIO driver (drivers/soc/tsi, drivers/pinctrl/tsi).
+
 config ARCH_UNIPHIER
 	bool "Socionext UniPhier SoC Family"
 	select ARCH_HAS_RESET_CONTROLLER
