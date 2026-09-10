@@ -225,23 +225,15 @@ static int dwa_wait_idle(struct dwa_i2c_dev *d)
 	return ret;
 }
 
-/* Issue one IC_DATA_CMD and wait for it to retire. */
-static int dwa_issue(struct dwa_i2c_dev *d, u32 cmd)
+/*
+ * Queue one IC_DATA_CMD. The command retires asynchronously -- IC_STATUS
+ * only goes idle once the controller reaches a STOP, so the caller must not
+ * wait for idle after every byte, only after the byte that actually carries
+ * STOP (see dwa_xfer_msg()).
+ */
+static void dwa_issue(struct dwa_i2c_dev *d, u32 cmd)
 {
-	u32 trmnt;
-	int ret;
-
 	dwa_write(d, DWA_IC_DATA_CMD, cmd);
-
-	ret = dwa_wait_idle(d);
-	if (ret)
-		return ret;
-
-	trmnt = dwa_read(d, DWA_IC_TX_TRMNT_SOURCE);
-	if (trmnt)
-		return dwa_trmnt_to_errno(d, trmnt);
-
-	return 0;
 }
 
 static int dwa_read_byte(struct dwa_i2c_dev *d, u8 *out)
@@ -269,19 +261,35 @@ static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool last)
 
 	for (i = 0; i < msg->len; i++) {
 		u32 cmd = is_read ? DWA_IC_DATA_CMD_CMD : msg->buf[i];
-
 		/* STOP goes on the final byte of the final message only. */
-		if (last && i == msg->len - 1)
+		bool is_stop = last && i == msg->len - 1;
+
+		if (is_stop)
 			cmd |= DWA_IC_DATA_CMD_STOP;
 
-		ret = dwa_issue(d, cmd);
-		if (ret)
-			return ret;
+		dwa_issue(d, cmd);
 
+		/*
+		 * Drain read data as the FIFO fills rather than waiting for
+		 * idle: without STOP the controller never goes idle, so this
+		 * is the only way a multi-byte read makes progress.
+		 */
 		if (is_read) {
 			ret = dwa_read_byte(d, &msg->buf[i]);
 			if (ret)
 				return ret;
+		}
+
+		if (is_stop) {
+			u32 trmnt;
+
+			ret = dwa_wait_idle(d);
+			if (ret)
+				return ret;
+
+			trmnt = dwa_read(d, DWA_IC_TX_TRMNT_SOURCE);
+			if (trmnt)
+				return dwa_trmnt_to_errno(d, trmnt);
 		}
 	}
 	return 0;
