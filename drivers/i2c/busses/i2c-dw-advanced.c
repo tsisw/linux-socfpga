@@ -205,14 +205,38 @@ static int dwa_wait_idle(struct dwa_i2c_dev *d)
 }
 
 /*
+ * Wait for a free IC_DATA_CMD slot. Without this, writes longer than the TX
+ * FIFO depth overflow it: IC_DATA_CMD is fire-and-forget, so a write past a
+ * full FIFO is simply dropped by the controller rather than queued or
+ * stalled.
+ */
+static int dwa_wait_tx_not_full(struct dwa_i2c_dev *d)
+{
+	u32 status;
+
+	return readl_poll_timeout(d->base + d->blk + DWA_IC_STATUS, status,
+				  status & DWA_IC_STATUS_TFNF,
+				  DWA_POLL_INTERVAL_US, DWA_XFER_TIMEOUT_US);
+}
+
+/*
  * Queue one IC_DATA_CMD. The command retires asynchronously -- IC_STATUS
  * only goes idle once the controller reaches a STOP, so the caller must not
  * wait for idle after every byte, only after the byte that actually carries
  * STOP (see dwa_xfer_msg()).
  */
-static void dwa_issue(struct dwa_i2c_dev *d, u32 cmd)
+static int dwa_issue(struct dwa_i2c_dev *d, u32 cmd)
 {
+	int ret;
+
+	ret = dwa_wait_tx_not_full(d);
+	if (ret) {
+		dev_err(d->dev, "timeout waiting for TX FIFO space\n");
+		return ret;
+	}
+
 	dwa_write(d, DWA_IC_DATA_CMD, cmd);
+	return 0;
 }
 
 static int dwa_read_byte(struct dwa_i2c_dev *d, u8 *out)
@@ -268,7 +292,9 @@ static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool first,
 		if (is_stop)
 			cmd |= DWA_IC_DATA_CMD_STOP;
 
-		dwa_issue(d, cmd);
+		ret = dwa_issue(d, cmd);
+		if (ret)
+			return ret;
 
 		/*
 		 * Drain read data as the FIFO fills rather than waiting for
