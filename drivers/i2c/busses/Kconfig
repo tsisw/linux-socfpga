@@ -644,6 +644,7 @@ config I2C_DIGICOLOR
 config I2C_DW_ADVANCED
 	tristate "Synopsys DWC_i2c (Advanced I2C/SMBus) controller"
 	depends on OF
+	depends on TSI_CHIPLET || COMPILE_TEST
 	help
 	  Say Y here if you want to use the Synopsys DWC_i2c "Advanced
 	  I2C/SMBus Controller and Target Device", as instantiated on
