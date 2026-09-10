@@ -257,6 +257,7 @@ static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool first,
 			 bool last)
 {
 	bool is_read = !!(msg->flags & I2C_M_RD);
+	bool recv_len = is_read && (msg->flags & I2C_M_RECV_LEN);
 	int ret;
 	u16 i;
 
@@ -276,6 +277,15 @@ static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool first,
 		if (i == 0 && !first && !(msg->flags & I2C_M_NOSTART))
 			cmd |= DWA_IC_DATA_CMD_RESTART;
 
+		/*
+		 * The SMBus block-read length prefix makes msg->len == 1 at
+		 * this point, so the real last byte is not known yet; the
+		 * STOP goes on the last byte of the adjusted length instead
+		 * (see the recv_len block below).
+		 */
+		if (is_stop && recv_len && i == 0)
+			is_stop = false;
+
 		if (is_stop)
 			cmd |= DWA_IC_DATA_CMD_STOP;
 
@@ -290,6 +300,27 @@ static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool first,
 			ret = dwa_read_byte(d, &msg->buf[i]);
 			if (ret)
 				return ret;
+
+			/*
+			 * First byte of an SMBus block read is the count of
+			 * bytes that follow. Grow the message so the loop
+			 * above keeps draining through the real last byte
+			 * instead of stopping after just the count; clamp to
+			 * I2C_SMBUS_BLOCK_MAX since a bogus count would
+			 * otherwise run the read past the caller's buffer.
+			 * msg->len is always >= 2 after this, so the loop's
+			 * is_stop check for later iterations lands on the
+			 * real final byte without any further help here.
+			 */
+			if (recv_len && i == 0) {
+				u8 block_len = msg->buf[0];
+
+				if (!block_len || block_len > I2C_SMBUS_BLOCK_MAX)
+					block_len = 1;
+
+				msg->len = block_len + 1;
+				recv_len = false;
+			}
 		}
 
 		if (is_stop) {
@@ -349,10 +380,31 @@ out_err:
 	return ret;
 }
 
+/*
+ * I2C_FUNC_SMBUS_EMUL also advertises I2C_FUNC_SMBUS_QUICK, which this
+ * controller cannot do: a QUICK transfer is address-plus-R/W-bit with no
+ * data byte at all, but IC_DATA_CMD only ever queues a byte together with
+ * the address phase, so a zero-length message here produces no bus
+ * transaction whatsoever instead of the address-only one SMBus expects.
+ * Advertise everything else SMBus emulation needs individually, the same
+ * set i2c-designware-master.c uses for the same reason.
+ */
 static u32 dwa_func(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_BYTE | I2C_FUNC_SMBUS_BYTE_DATA |
+	       I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_BLOCK_DATA |
+	       I2C_FUNC_SMBUS_I2C_BLOCK;
 }
+
+/*
+ * Reject zero-length messages before they reach dwa_xfer(): without
+ * I2C_FUNC_SMBUS_QUICK the core's SMBus emulation never builds one, but a
+ * raw i2c_transfer() caller still could, and dwa_xfer_msg()'s loop would
+ * silently skip it -- no address phase, no STOP, no error.
+ */
+static const struct i2c_adapter_quirks dwa_quirks = {
+	.flags = I2C_AQ_NO_ZERO_LEN,
+};
 
 static const struct i2c_algorithm dwa_algo = {
 	.xfer = dwa_xfer,
@@ -444,6 +496,7 @@ static int dwa_probe(struct platform_device *pdev)
 	strscpy(d->adap.name, "TSI SkyLP DWC_i2c adapter", sizeof(d->adap.name));
 	d->adap.owner = THIS_MODULE;
 	d->adap.algo = &dwa_algo;
+	d->adap.quirks = &dwa_quirks;
 	d->adap.dev.parent = dev;
 	d->adap.dev.of_node = dev->of_node;
 
