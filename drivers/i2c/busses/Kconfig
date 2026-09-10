@@ -658,6 +658,19 @@ config I2C_DW_ADVANCED
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-dw-advanced.
 
+config I2C_DW_ADVANCED_KUNIT_TEST
+	tristate "KUnit tests for the DWC_i2c advanced driver" if !KUNIT_ALL_TESTS
+	depends on I2C_DW_ADVANCED && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Builds unit tests for the DWC_i2c advanced I2C driver: speed-bit
+	  selection, termination-source errno mapping, register offset
+	  arithmetic, configure path, and transfer path validation, all
+	  against a fake MMIO backing instead of hardware. Runs under UML
+	  via tools/testing/kunit/kunit.py.
+
+	  Say N unless you are developing the driver.
+
 config I2C_EG20T
 	tristate "Intel EG20T PCH/LAPIS Semicon IOH(ML7213/ML7223/ML7831) I2C"
 	depends on PCI && (X86_32 || MIPS || COMPILE_TEST)

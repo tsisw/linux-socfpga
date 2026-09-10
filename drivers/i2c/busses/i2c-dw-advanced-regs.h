@@ -34,6 +34,10 @@
 #ifndef __I2C_DW_ADVANCED_REGS_H__
 #define __I2C_DW_ADVANCED_REGS_H__
 
+#include <linux/bits.h>
+#include <linux/i2c.h>
+#include <linux/types.h>
+
 /* Operational block -- fixed at offset 0 in the register file. */
 #define DWA_IC_HCI_VERSION		0x00
 #define DWA_IC_ENABLE			0x04
@@ -122,5 +126,26 @@
 
 /* Expected identity. */
 #define DWA_IC_COMP_TYPE_VALUE		0x44570140
+
+struct dwa_i2c_dev {
+	struct device		*dev;
+	void __iomem		*base;
+	struct i2c_adapter	adap;
+	u32			blk;
+	u32			scl_hcnt;
+	u32			scl_lcnt;
+	u32			bus_freq_hz;
+	u16			cfg_addr;
+};
+
+#define DWA_ADDR_UNCONFIGURED	0xffff
+
+#if IS_ENABLED(CONFIG_KUNIT)
+u32 dwa_speed_bits(u32 bus_freq_hz);
+int dwa_trmnt_to_errno(struct dwa_i2c_dev *d, u32 trmnt);
+u32 dwa_func(struct i2c_adapter *adap);
+extern const struct i2c_adapter_quirks dwa_quirks;
+extern const struct i2c_algorithm dwa_algo;
+#endif
 
 #endif /* __I2C_DW_ADVANCED_REGS_H__ */

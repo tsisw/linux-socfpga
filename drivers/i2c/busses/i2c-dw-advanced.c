@@ -51,6 +51,8 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 
+#include <kunit/visibility.h>
+
 #include "i2c-dw-advanced-regs.h"
 
 #define DWA_DRV_NAME		"i2c-dw-advanced"
@@ -77,30 +79,6 @@
 #define DWA_ENABLE_TIMEOUT_US	100000
 #define DWA_XFER_TIMEOUT_US	500000
 #define DWA_POLL_INTERVAL_US	10
-
-struct dwa_i2c_dev {
-	struct device		*dev;
-	void __iomem		*base;		/* controller register file */
-	struct i2c_adapter	adap;
-	u32			blk;		/* IC_I2C_BLOCK_OFFSET value */
-	u32			scl_hcnt;
-	u32			scl_lcnt;
-	u32			bus_freq_hz;
-	/*
-	 * Target address the controller is currently programmed for, or
-	 * DWA_ADDR_UNCONFIGURED. Kept across transfers so a repeated transfer
-	 * to the same device skips the disable/program/enable cycle: that
-	 * cycle is 11 register accesses, and under tsisim every access is a
-	 * socket round trip to the behavioural model. For a 1 Hz sensor poll
-	 * it was 40% of all traffic.
-	 *
-	 * Invalidated on any error, so a failed transfer always reprograms
-	 * from scratch rather than inheriting whatever state it left behind.
-	 */
-	u16			cfg_addr;
-};
-
-#define DWA_ADDR_UNCONFIGURED	0xffff
 
 /* Operational-block accessors: fixed at offset 0. */
 static inline u32 dwa_op_read(struct dwa_i2c_dev *d, u32 off)
@@ -146,7 +124,7 @@ static int dwa_enable(struct dwa_i2c_dev *d)
 	return dwa_wait_enable_state(d, true);
 }
 
-static u32 dwa_speed_bits(u32 bus_freq_hz)
+VISIBLE_IF_KUNIT u32 dwa_speed_bits(u32 bus_freq_hz)
 {
 	if (bus_freq_hz > I2C_MAX_FAST_MODE_PLUS_FREQ)
 		return DWA_IC_CTRL_SPEED_HIGH;
@@ -154,6 +132,7 @@ static u32 dwa_speed_bits(u32 bus_freq_hz)
 		return DWA_IC_CTRL_SPEED_FAST;
 	return DWA_IC_CTRL_SPEED_STANDARD;
 }
+EXPORT_SYMBOL_IF_KUNIT(dwa_speed_bits);
 
 /*
  * Bring the controller up in controller mode at the configured speed and
@@ -186,8 +165,7 @@ static int dwa_configure(struct dwa_i2c_dev *d, u16 target_addr)
 	return dwa_enable(d);
 }
 
-/* Map a termination cause onto an errno the I2C core understands. */
-static int dwa_trmnt_to_errno(struct dwa_i2c_dev *d, u32 trmnt)
+VISIBLE_IF_KUNIT int dwa_trmnt_to_errno(struct dwa_i2c_dev *d, u32 trmnt)
 {
 	if (trmnt & DWA_TRMNT_ADDR_NOACK_MASK) {
 		dev_dbg(d->dev, "address NACK (IC_TX_TRMNT_SOURCE 0x%08x)\n",
@@ -207,6 +185,7 @@ static int dwa_trmnt_to_errno(struct dwa_i2c_dev *d, u32 trmnt)
 		trmnt);
 	return -EIO;
 }
+EXPORT_SYMBOL_IF_KUNIT(dwa_trmnt_to_errno);
 
 /* Wait for the controller to go idle with the TX FIFO drained. */
 static int dwa_wait_idle(struct dwa_i2c_dev *d)
@@ -389,12 +368,13 @@ out_err:
  * Advertise everything else SMBus emulation needs individually, the same
  * set i2c-designware-master.c uses for the same reason.
  */
-static u32 dwa_func(struct i2c_adapter *adap)
+VISIBLE_IF_KUNIT u32 dwa_func(struct i2c_adapter *adap)
 {
 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_BYTE | I2C_FUNC_SMBUS_BYTE_DATA |
 	       I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_BLOCK_DATA |
 	       I2C_FUNC_SMBUS_I2C_BLOCK;
 }
+EXPORT_SYMBOL_IF_KUNIT(dwa_func);
 
 /*
  * Reject zero-length messages before they reach dwa_xfer(): without
@@ -402,14 +382,16 @@ static u32 dwa_func(struct i2c_adapter *adap)
  * raw i2c_transfer() caller still could, and dwa_xfer_msg()'s loop would
  * silently skip it -- no address phase, no STOP, no error.
  */
-static const struct i2c_adapter_quirks dwa_quirks = {
+VISIBLE_IF_KUNIT const struct i2c_adapter_quirks dwa_quirks = {
 	.flags = I2C_AQ_NO_ZERO_LEN,
 };
+EXPORT_SYMBOL_IF_KUNIT(dwa_quirks);
 
-static const struct i2c_algorithm dwa_algo = {
+VISIBLE_IF_KUNIT const struct i2c_algorithm dwa_algo = {
 	.xfer = dwa_xfer,
 	.functionality = dwa_func,
 };
+EXPORT_SYMBOL_IF_KUNIT(dwa_algo);
 
 static int dwa_probe(struct platform_device *pdev)
 {
