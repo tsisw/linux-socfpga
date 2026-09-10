@@ -253,7 +253,8 @@ static int dwa_read_byte(struct dwa_i2c_dev *d, u8 *out)
 	return 0;
 }
 
-static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool last)
+static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool first,
+			 bool last)
 {
 	bool is_read = !!(msg->flags & I2C_M_RD);
 	int ret;
@@ -263,6 +264,17 @@ static int dwa_xfer_msg(struct dwa_i2c_dev *d, struct i2c_msg *msg, bool last)
 		u32 cmd = is_read ? DWA_IC_DATA_CMD_CMD : msg->buf[i];
 		/* STOP goes on the final byte of the final message only. */
 		bool is_stop = last && i == msg->len - 1;
+
+		/*
+		 * RESTART goes on the first byte of every message after the
+		 * first: without it, combined transfers (e.g. SMBus
+		 * write-command-then-read) run as one continued transaction
+		 * instead of getting the repeated START register-based SMBus
+		 * relies on. I2C_M_NOSTART opts a message out, gluing it onto
+		 * the previous one instead.
+		 */
+		if (i == 0 && !first && !(msg->flags & I2C_M_NOSTART))
+			cmd |= DWA_IC_DATA_CMD_RESTART;
 
 		if (is_stop)
 			cmd |= DWA_IC_DATA_CMD_STOP;
@@ -320,7 +332,7 @@ static int dwa_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 			d->cfg_addr = msgs[i].addr;
 		}
 
-		ret = dwa_xfer_msg(d, &msgs[i], i == num - 1);
+		ret = dwa_xfer_msg(d, &msgs[i], i == 0, i == num - 1);
 		if (ret)
 			goto out_err;
 	}
