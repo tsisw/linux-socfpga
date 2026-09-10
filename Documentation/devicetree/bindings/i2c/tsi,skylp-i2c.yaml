@@ -69,6 +69,7 @@ properties:
 required:
   - compatible
   - reg
+  - pinctrl-0
 
 unevaluatedProperties: false
 
