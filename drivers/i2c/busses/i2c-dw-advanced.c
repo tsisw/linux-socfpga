@@ -344,6 +344,7 @@ static int dwa_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct dwa_i2c_dev *d;
 	u32 comp_type, hci_version;
+	bool have_hcnt, have_lcnt;
 	int ret;
 
 	d = devm_kzalloc(dev, sizeof(*d), GFP_KERNEL);
@@ -360,9 +361,27 @@ static int dwa_probe(struct platform_device *pdev)
 	if (device_property_read_u32(dev, "clock-frequency", &d->bus_freq_hz))
 		d->bus_freq_hz = I2C_MAX_FAST_MODE_FREQ;
 
-	if (device_property_read_u32(dev, "tsi,scl-hcnt", &d->scl_hcnt))
+	have_hcnt = !device_property_read_u32(dev, "tsi,scl-hcnt", &d->scl_hcnt);
+	have_lcnt = !device_property_read_u32(dev, "tsi,scl-lcnt", &d->scl_lcnt);
+
+	/*
+	 * DWA_DEFAULT_SCL_HCNT/LCNT are validated for fast mode only (see the
+	 * comment at their definition). A clock-frequency that selects a
+	 * different speed mode needs matching counts from device tree --
+	 * there is no clock rate to compute them from, so silently keeping
+	 * the fast-mode counts would just run the requested mode at the
+	 * wrong rate.
+	 */
+	if (d->bus_freq_hz != I2C_MAX_FAST_MODE_FREQ && !(have_hcnt && have_lcnt)) {
+		dev_err(dev,
+			"clock-frequency %u requires both tsi,scl-hcnt and tsi,scl-lcnt (defaults are fast-mode only)\n",
+			d->bus_freq_hz);
+		return -EINVAL;
+	}
+
+	if (!have_hcnt)
 		d->scl_hcnt = DWA_DEFAULT_SCL_HCNT;
-	if (device_property_read_u32(dev, "tsi,scl-lcnt", &d->scl_lcnt))
+	if (!have_lcnt)
 		d->scl_lcnt = DWA_DEFAULT_SCL_LCNT;
 
 	/*
