@@ -38,6 +38,7 @@
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
 #include <asm/ptdump.h>
+#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/pgalloc.h>
 #include <asm/kfence.h>
@@ -1204,10 +1205,47 @@ static void free_empty_tables(unsigned long addr, unsigned long end,
 }
 #endif
 
+/*
+ * TSI pro-FPGA bring-up knob, default 0 so the kernel behaves exactly as it did
+ * on commit 26d103480 unless the boot arguments ask otherwise:
+ *   bit 0  clean the descriptor we just wrote out to the point of coherency
+ *   bit 1  invalidate any translation cached for the range it maps
+ * The architecture lets us stop at the barrier inside set_pmd because the table
+ * walker snoops the data cache. This platform has already been caught sending a
+ * dirty line to the wrong physical address, so that assumption is worth testing
+ * rather than trusting. Pass tsi_vmemmap_fix=3 to do both.
+ */
+int tsi_vmemmap_fix __read_mostly;
+
+static int __init tsi_vmemmap_fix_setup(char *str)
+{
+	if (!str || kstrtoint(str, 0, &tsi_vmemmap_fix))
+		tsi_vmemmap_fix = 3;
+	return 0;
+}
+early_param("tsi_vmemmap_fix", tsi_vmemmap_fix_setup);
+
 void __meminit vmemmap_set_pmd(pmd_t *pmdp, void *p, int node,
 			       unsigned long addr, unsigned long next)
 {
 	pmd_set_huge(pmdp, __pa(p), __pgprot(PROT_SECT_NORMAL));
+
+	/*
+	 * One line per section. This is the only place that says which physical
+	 * 2 MiB block backs each section of the page metadata, and the board
+	 * stops on the first store into the second one.
+	 */
+	pr_info("TSI: vmemmap %lx..%lx pa %llx pmdp %px pmd %llx fix %d\n",
+		addr, next, (unsigned long long)__pa(p), pmdp,
+		(unsigned long long)pmd_val(READ_ONCE(*pmdp)), tsi_vmemmap_fix);
+
+	if (tsi_vmemmap_fix & 1) {
+		dcache_clean_inval_poc((unsigned long)pmdp,
+				       (unsigned long)pmdp + sizeof(*pmdp));
+		dsb(ish);
+	}
+	if (tsi_vmemmap_fix & 2)
+		flush_tlb_kernel_range(addr, next);
 }
 
 int __meminit vmemmap_check_pmd(pmd_t *pmdp, int node,

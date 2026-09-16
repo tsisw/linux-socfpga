@@ -888,8 +888,24 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 	 */
 	tsi_mark_c(0x7c);
 	for (pfn = start_pfn; pfn < end_pfn; ) {
-		if ((pfn & 0xfff) == 0)
+		/*
+		 * The DDR trail is written with a clean to the point of
+		 * coherency, and this platform has been caught sending a dirty
+		 * line to the wrong physical address, so a trail that stops
+		 * does not prove a kernel that stopped. The console is up by
+		 * now and does not depend on cache maintenance, so say it out
+		 * loud as well. Three points per sample so we can tell a stall
+		 * in the page metadata write from one in the pageblock bitmap:
+		 * they are different allocations and both are first touched at
+		 * the start of a new section.
+		 */
+		bool tsi_watch = (pfn & 0xfff) == 0;
+
+		if (tsi_watch) {
 			tsi_mark_c(0x7b);
+			pr_info("TSI: memmap pfn %lx page %px enter\n", pfn,
+				(void *)pfn_to_page(pfn));
+		}
 		/*
 		 * There can be holes in boot-time mem_map[]s handed to this
 		 * function.  They do not exist on hotplugged memory.
@@ -905,6 +921,10 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 
 		page = pfn_to_page(pfn);
 		__init_single_page(page, pfn, zone, nid);
+		if (tsi_watch) {
+			tsi_mark_c(0x7d);
+			pr_info("TSI: memmap pfn %lx page written\n", pfn);
+		}
 		if (context == MEMINIT_HOTPLUG) {
 #ifdef CONFIG_ZONE_DEVICE
 			if (zone == ZONE_DEVICE)
@@ -923,8 +943,14 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 			set_pageblock_migratetype(page, migratetype);
 			cond_resched();
 		}
+		if (tsi_watch) {
+			tsi_mark_c(0x7e);
+			pr_info("TSI: memmap pfn %lx pageblock set\n", pfn);
+		}
 		pfn++;
 	}
+	tsi_mark_c(0x7f);
+	pr_info("TSI: memmap_init_range done %lx..%lx\n", start_pfn, end_pfn);
 }
 
 static void __init memmap_init_zone_range(struct zone *zone,
