@@ -32,6 +32,9 @@ PROVIDE(__efistub_screen_info		= screen_info);
 #endif
 PROVIDE(__efistub__ctype		= _ctype);
 
+PROVIDE(__pi_tsi_trail			= tsi_trail);
+PROVIDE(__pi_tsi_info			= tsi_info);
+PROVIDE(__pi_tsi_trail_idx		= tsi_trail_idx);
 PROVIDE(__pi___memcpy			= __pi_memcpy);
 PROVIDE(__pi___memmove			= __pi_memmove);
 PROVIDE(__pi___memset			= __pi_memset);

@@ -85,3 +85,6 @@ endif
 
 # for cleaning
 subdir- += vdso vdso32
+
+# TSI pro-FPGA bring-up diagnostics (boot trail + recording vectors)
+obj-y					+= tsi_diag.o

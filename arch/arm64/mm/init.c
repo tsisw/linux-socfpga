@@ -43,6 +43,7 @@
 #include <asm/numa.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
+#include <asm/tsi_diag.h>
 #include <linux/sizes.h>
 #include <asm/tlb.h>
 #include <asm/alternative.h>
@@ -324,6 +325,25 @@ void __init bootmem_init(void)
 	max_pfn = max_low_pfn = max;
 	min_low_pfn = min;
 
+	/*
+	 * Print it unconditionally: if the kernel image is not covered by a
+	 * reserved region here, every later overwrite follows from that, and we
+	 * want to see it whether or not an allocation happens to land badly.
+	 */
+	{
+		int i;
+
+		pr_info("TSI: kernel image %llx..%llx, memstart %llx\n",
+			(unsigned long long)__pa_symbol(_text),
+			(unsigned long long)__pa_symbol(_end),
+			(unsigned long long)memstart_addr);
+		for (i = 0; i < memblock.reserved.cnt; i++)
+			pr_info("TSI: reserved[%d] %llx..%llx\n", i,
+				(unsigned long long)memblock.reserved.regions[i].base,
+				(unsigned long long)(memblock.reserved.regions[i].base +
+						     memblock.reserved.regions[i].size));
+	}
+	tsi_mark_c(0x70);
 	arch_numa_init();
 
 	/*
@@ -335,25 +355,31 @@ void __init bootmem_init(void)
 	arm64_hugetlb_cma_reserve();
 #endif
 
+	tsi_mark_c(0x71);
 	kvm_hyp_reserve();
 
 	/*
 	 * sparse_init() tries to allocate memory from memblock, so must be
 	 * done after the fixed reservations
 	 */
+	tsi_mark_c(0x72);
 	sparse_init();
+	tsi_mark_c(0x73);
 	zone_sizes_init();
+	tsi_mark_c(0x74);
 
 	/*
 	 * Reserve the CMA area after arm64_dma_phys_limit was initialised.
 	 */
 	dma_contiguous_reserve(arm64_dma_phys_limit);
+	tsi_mark_c(0x75);
 
 	/*
 	 * request_standard_resources() depends on crashkernel's memory being
 	 * reserved, so do it here.
 	 */
 	arch_reserve_crashkernel();
+	tsi_mark_c(0x76);
 
 	memblock_dump_all();
 }

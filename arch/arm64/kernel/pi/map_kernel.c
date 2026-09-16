@@ -207,6 +207,66 @@ static void __init map_fdt(u64 fdt)
 	dsb(ishst);
 }
 
+/*
+ * A trail mark from position-independent code: the same store-and-clean as
+ * asm/tsi_diag.h, written inline because this object is renamed to __pi_* and
+ * cannot call into the rest of the kernel.
+ */
+static void __init tsi_pi_mark(int id)
+{
+	asm volatile(
+	"	adrp	x16, tsi_trail_idx		\n"
+	"	add	x16, x16, :lo12:tsi_trail_idx	\n"
+	"	ldr	x17, [x16]			\n"
+	"	add	x17, x17, #1			\n"
+	"	and	x17, x17, #0xff			\n"
+	"	str	x17, [x16]			\n"
+	"	dsb	sy				\n"
+	"	dc	civac, x16			\n"
+	"	adrp	x16, tsi_trail			\n"
+	"	add	x16, x16, :lo12:tsi_trail	\n"
+	"	add	x16, x16, x17			\n"
+	"	strb	%w0, [x16]			\n"
+	"	dsb	sy				\n"
+	"	dc	civac, x16			\n"
+	"	dsb	sy				\n"
+	: : "r"(id) : "x16", "x17", "memory");
+}
+
+/*
+ * Stash the registers that decide how memset behaves, so the host can read them
+ * instead of us guessing at what the core reports.
+ */
+static void __init tsi_pi_info(void)
+{
+	asm volatile(
+	"	adrp	x16, tsi_info			\n"
+	"	add	x16, x16, :lo12:tsi_info	\n"
+	"	mrs	x17, dczid_el0			\n"
+	"	str	x17, [x16, #0]			\n"
+	"	mrs	x17, ctr_el0			\n"
+	"	str	x17, [x16, #8]			\n"
+	"	mrs	x17, midr_el1			\n"
+	"	str	x17, [x16, #16]			\n"
+	"	mrs	x17, sctlr_el1			\n"
+	"	str	x17, [x16, #24]			\n"
+	"	mrs	x17, tcr_el1			\n"
+	"	str	x17, [x16, #32]			\n"
+	"	mrs	x17, ttbr0_el1			\n"
+	"	str	x17, [x16, #40]			\n"
+	"	mrs	x17, id_aa64mmfr0_el1		\n"
+	"	str	x17, [x16, #48]			\n"
+	"	mov	x17, #0x4649			\n"
+	"	movk	x17, #0x5453, lsl #16		\n"
+	"	str	x17, [x16, #56]			\n"
+	"	dsb	sy				\n"
+	"	dc	civac, x16			\n"
+	"	add	x16, x16, #56			\n"
+	"	dc	civac, x16			\n"
+	"	dsb	sy				\n"
+	: : : "x16", "x17", "memory");
+}
+
 asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 {
 	static char const chosen_str[] __initconst = "/chosen";
@@ -216,14 +276,55 @@ asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 	int va_bits = VA_BITS;
 	int chosen;
 
+	tsi_pi_mark(0x40);
 	map_fdt((u64)fdt);
+	tsi_pi_mark(0x41);
 
-	/* Clear BSS and the initial page tables */
-	memset(__bss_start, 0, (u64)init_pg_end - (u64)__bss_start);
+	/*
+	 * Clear BSS and the initial page tables. Written as a marked loop of plain
+	 * stores rather than one memset call: run 11 hung somewhere in this clear
+	 * with no exception, and the library memset uses DC ZVA, so this separates
+	 * "the memory will not take stores" from "that instruction does not work".
+	 * The trail lives in .data, above __bss_start, so the clear cannot erase it.
+	 */
+	tsi_pi_info();
+	{
+		u64 s = (u64)__bss_start, e = (u64)init_pg_end;
+		int chunk = 0;
+
+		while (s < e) {
+			u64 n = (e - s) > (64 * 1024) ? (64 * 1024) : (e - s);
+			volatile u64 *p = (volatile u64 *)s;
+			volatile u64 *q = (volatile u64 *)(s + (n & ~7UL));
+
+			while (p < q)
+				*p++ = 0;
+			if (n & 7) {
+				volatile u8 *b = (volatile u8 *)q;
+
+				while ((u64)b < s + n)
+					*b++ = 0;
+			}
+			tsi_pi_mark(0x50 + chunk);
+			chunk++;
+			s += n;
+		}
+	}
+	tsi_pi_mark(0x42);
+
+	/*
+	 * Now exercise the library memset on a range we just cleared by hand. If the
+	 * trail stops between these two marks, DC ZVA is the thing that hangs.
+	 */
+	tsi_pi_mark(0x60);
+	memset(__bss_start, 0, 64 * 1024);
+	tsi_pi_mark(0x61);
 
 	/* Parse the command line for CPU feature overrides */
 	chosen = fdt_path_offset(fdt, chosen_str);
+	tsi_pi_mark(0x43);
 	init_feature_override(boot_status, fdt, chosen);
+	tsi_pi_mark(0x44);
 
 	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES) && !cpu_has_lva()) {
 		va_bits = VA_BITS_MIN;
@@ -232,8 +333,10 @@ asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 		root_level++;
 	}
 
+	tsi_pi_mark(0x45);
 	if (va_bits > VA_BITS_MIN)
 		sysreg_clear_set(tcr_el1, TCR_T1SZ_MASK, TCR_T1SZ(va_bits));
+	tsi_pi_mark(0x46);
 
 	/*
 	 * The virtual KASLR displacement modulo 2MiB is decided by the
@@ -253,7 +356,9 @@ asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 
 	if (IS_ENABLED(CONFIG_ARM64_LPA2) && va_bits > VA_BITS_MIN)
 		remap_idmap_for_lpa2();
+	tsi_pi_mark(0x47);
 
 	va_base = KIMAGE_VADDR + kaslr_offset;
 	map_kernel(kaslr_offset, va_base - pa_base, root_level);
+	tsi_pi_mark(0x48);
 }

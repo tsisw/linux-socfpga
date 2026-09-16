@@ -31,6 +31,11 @@
 #include <linux/execmem.h>
 #include <linux/vmstat.h>
 #include "internal.h"
+#ifdef CONFIG_ARM64
+#include <asm/tsi_diag.h>
+#else
+static inline void tsi_mark_c(int id) { }
+#endif
 #include "slab.h"
 #include "shuffle.h"
 
@@ -1756,6 +1761,7 @@ static bool arch_has_descending_max_zone_pfns(void)
  */
 void __init free_area_init(unsigned long *max_zone_pfn)
 {
+	tsi_mark_c(0x78);
 	unsigned long start_pfn, end_pfn;
 	int i, nid, zone;
 	bool descending;
@@ -1856,7 +1862,9 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 	}
 
 	calc_nr_kernel_pages();
+	tsi_mark_c(0x79);
 	memmap_init();
+	tsi_mark_c(0x7a);
 
 	/* disable hash distribution for systems with a single node */
 	fixup_hashdist();

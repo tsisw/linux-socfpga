@@ -116,6 +116,51 @@ static phys_addr_t __init early_pgtable_alloc(int shift)
 	if (!phys)
 		panic("Failed to allocate page table page\n");
 
+	/*
+	 * TSI pro-FPGA bring-up. On this board an early page table was handed
+	 * out from a page inside the kernel image and overwrote .rodata, which
+	 * only surfaced much later as a wild pointer read out of __jump_table.
+	 * The image is reserved with memblock_reserve() in arm64_memblock_init,
+	 * so this must never fire; say so loudly at the point where the
+	 * allocator is still the only suspect, rather than at the crash.
+	 */
+	if (phys >= __pa_symbol(_text) && phys < __pa_symbol(_end)) {
+		static int tsi_said_it;
+		int i;
+
+		if (!tsi_said_it++) {
+			pr_err("TSI: early_pgtable_alloc returned %llx, INSIDE the kernel image [%llx,%llx)\n",
+			       (unsigned long long)phys,
+			       (unsigned long long)__pa_symbol(_text),
+			       (unsigned long long)__pa_symbol(_end));
+			pr_err("TSI: memstart_addr %llx kimage_voffset %llx PAGE_OFFSET %llx\n",
+			       (unsigned long long)memstart_addr,
+			       (unsigned long long)kimage_voffset,
+			       (unsigned long long)PAGE_OFFSET);
+			/*
+			 * Print the lists directly: memblock_dump_all() is a
+			 * no-op without memblock=debug, and that option costs
+			 * hundreds of printks on a board this slow.
+			 */
+			for (i = 0; i < memblock.memory.cnt; i++)
+				pr_err("TSI:   memory[%d]   %llx..%llx flags %x\n", i,
+				       (unsigned long long)memblock.memory.regions[i].base,
+				       (unsigned long long)(memblock.memory.regions[i].base +
+							    memblock.memory.regions[i].size),
+				       (unsigned int)memblock.memory.regions[i].flags);
+			for (i = 0; i < memblock.reserved.cnt; i++)
+				pr_err("TSI:   reserved[%d] %llx..%llx flags %x\n", i,
+				       (unsigned long long)memblock.reserved.regions[i].base,
+				       (unsigned long long)(memblock.reserved.regions[i].base +
+							    memblock.reserved.regions[i].size),
+				       (unsigned int)memblock.reserved.regions[i].flags);
+			pr_err("TSI:   memory.cnt %lu/%lu reserved.cnt %lu/%lu current_limit %llx\n",
+			       memblock.memory.cnt, memblock.memory.max,
+			       memblock.reserved.cnt, memblock.reserved.max,
+			       (unsigned long long)memblock.current_limit);
+		}
+	}
+
 	return phys;
 }
 

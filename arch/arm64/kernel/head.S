@@ -34,6 +34,7 @@
 #include <asm/sysreg.h>
 #include <asm/thread_info.h>
 #include <asm/virt.h>
+#include <asm/tsi_diag.h>
 
 #include "efi-header.S"
 
@@ -82,8 +83,10 @@
 	 *  x21        primary_entry() .. start_kernel()        FDT pointer passed at boot in x0
 	 */
 SYM_CODE_START(primary_entry)
+	tsi_mark	0x01
 	bl	record_mmu_state
 	bl	preserve_boot_args
+	tsi_mark	0x02
 
 	adrp	x1, early_init_stack
 	mov	sp, x1
@@ -91,6 +94,7 @@ SYM_CODE_START(primary_entry)
 	adrp	x0, init_idmap_pg_dir
 	mov	x1, xzr
 	bl	__pi_create_init_idmap
+	tsi_mark	0x03
 
 	/*
 	 * If the page tables have been populated with non-cacheable
@@ -115,9 +119,21 @@ SYM_CODE_START(primary_entry)
 	adr_l	x2, dcache_clean_poc
 	blr	x2
 
-1:	mov	x0, x19
+1:	tsi_mark	0x04
+	mov	x0, x19
 	bl	init_kernel_el			// w0=cpu_boot_mode
 	mov	x20, x0
+	tsi_mark	0x05
+
+	/*
+	 * VBAR_EL1 still holds its reset value at this point and the kernel
+	 * does not set it until __primary_switched, so a fault in __cpu_setup,
+	 * __enable_mmu or early_map_kernel would vanish into an unmapped
+	 * vector and loop forever. Record it instead.
+	 */
+	adr_l	x8, tsi_el1_vectors
+	msr	vbar_el1, x8
+	isb
 
 	/*
 	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
@@ -126,6 +142,7 @@ SYM_CODE_START(primary_entry)
 	 * the TCR will have been set.
 	 */
 	bl	__cpu_setup			// initialise processor
+	tsi_mark	0x06
 	b	__primary_switch
 SYM_CODE_END(primary_entry)
 
@@ -215,12 +232,14 @@ SYM_CODE_END(preserve_boot_args)
  *   x0 = __pa(KERNEL_START)
  */
 SYM_FUNC_START_LOCAL(__primary_switched)
+	tsi_mark	0x0a
 	adr_l	x4, init_task
 	init_cpu_task x4, x5, x6
 
 	adr_l	x8, vectors			// load VBAR_EL1 with virtual
 	msr	vbar_el1, x8			// vector table address
 	isb
+	tsi_mark	0x0b
 
 	stp	x29, x30, [sp, #-16]!
 	mov	x29, sp
@@ -233,12 +252,14 @@ SYM_FUNC_START_LOCAL(__primary_switched)
 
 	mov	x0, x20
 	bl	set_cpu_boot_mode_flag
+	tsi_mark	0x0c
 
 #if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
 	bl	kasan_early_init
 #endif
 	mov	x0, x20
 	bl	finalise_el2			// Prefer VHE if possible
+	tsi_mark	0x0d
 	ldp	x29, x30, [sp], #16
 	bl	start_kernel
 	ASM_BUG()
@@ -281,6 +302,7 @@ SYM_INNER_LABEL(init_el1, SYM_L_LOCAL)
 	eret
 
 SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
+	tsi_mark	0x11
 	msr	elr_el2, lr
 
 	// clean all HYP code to the PoC if we booted at EL2 with the MMU on
@@ -313,13 +335,16 @@ SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
 1:
 	msr	hcr_el2, x0
 	isb
+	tsi_mark	0x12
 
 	init_el2_state
+	tsi_mark	0x13
 
 	/* Hypervisor stub */
 	adr_l	x0, __hyp_stub_vectors
 	msr	vbar_el2, x0
 	isb
+	tsi_mark	0x14
 
 	mov_q	x1, INIT_SCTLR_EL1_MMU_OFF
 
@@ -340,6 +365,7 @@ SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
 
 	mov	w0, #BOOT_CPU_MODE_EL2
 	orr	x0, x0, x2
+	tsi_mark	0x15
 	eret
 SYM_FUNC_END(init_kernel_el)
 
@@ -519,9 +545,11 @@ SYM_FUNC_START_LOCAL(__no_granule_support)
 SYM_FUNC_END(__no_granule_support)
 
 SYM_FUNC_START_LOCAL(__primary_switch)
+	tsi_mark	0x07
 	adrp	x1, reserved_pg_dir
 	adrp	x2, init_idmap_pg_dir
 	bl	__enable_mmu
+	tsi_mark	0x08
 
 	adrp	x1, early_init_stack
 	mov	sp, x1
@@ -529,6 +557,7 @@ SYM_FUNC_START_LOCAL(__primary_switch)
 	mov	x0, x20				// pass the full boot status
 	mov	x1, x21				// pass the FDT
 	bl	__pi_early_map_kernel		// Map and relocate the kernel
+	tsi_mark	0x09
 
 	ldr	x8, =__primary_switched
 	adrp	x0, KERNEL_START		// __pa(KERNEL_START)

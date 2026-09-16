@@ -46,6 +46,7 @@
 #include <asm/scs.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
+#include <asm/tsi_diag.h>
 #include <asm/smp_plat.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -287,9 +288,12 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	kaslr_init();
 
+	tsi_mark_c(0x21);
 	early_fixmap_init();
+	tsi_mark_c(0x22);
 	early_ioremap_init();
 
+	tsi_mark_c(0x23);
 	setup_machine_fdt(__fdt_pointer);
 
 	/*
@@ -297,7 +301,9 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	 * cpufeature code and early parameters.
 	 */
 	jump_label_init();
+	tsi_mark_c(0x24);
 	parse_early_param();
+	tsi_mark_c(0x25);
 
 	dynamic_scs_init();
 
@@ -330,8 +336,10 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 			   FW_BUG "Booted with MMU enabled!");
 	}
 
+	tsi_mark_c(0x26);
 	arm64_memblock_init();
 
+	tsi_mark_c(0x27);
 	paging_init();
 
 	acpi_table_upgrade();
@@ -340,14 +348,17 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	acpi_boot_table_init();
 
 	if (acpi_disabled)
+		tsi_mark_c(0x28);
 		unflatten_device_tree();
 
+	tsi_mark_c(0x29);
 	bootmem_init();
 
 	kasan_init();
 
 	request_standard_resources();
 
+	tsi_mark_c(0x2a);
 	early_ioremap_reset();
 
 	if (acpi_disabled)
@@ -356,7 +367,9 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 		psci_acpi_init();
 
 	init_bootcpu_ops();
+	tsi_mark_c(0x2b);
 	smp_init_cpus();
+	tsi_mark_c(0x2c);
 	smp_build_mpidr_hash();
 
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN

@@ -72,6 +72,11 @@
 #include <linux/kthread.h>
 #include <linux/sched.h>
 #include <linux/sched/init.h>
+#ifdef CONFIG_ARM64
+#include <asm/tsi_diag.h>
+#else
+static inline void tsi_mark_c(int id) { }
+#endif
 #include <linux/signal.h>
 #include <linux/idr.h>
 #include <linux/kgdb.h>
@@ -921,8 +926,11 @@ void start_kernel(void)
 	 */
 	boot_cpu_init();
 	page_address_init();
+	tsi_mark_c(0x30);
 	pr_notice("%s", linux_banner);
+	tsi_mark_c(0x31);
 	setup_arch(&command_line);
+	tsi_mark_c(0x32);
 	/* Static keys and static calls are needed by LSMs */
 	jump_label_init();
 	static_call_init();
@@ -960,7 +968,9 @@ void start_kernel(void)
 	setup_log_buf(0);
 	vfs_caches_init_early();
 	sort_main_extable();
+	tsi_mark_c(0x33);
 	trap_init();
+	tsi_mark_c(0x34);
 	mm_core_init();
 	poking_init();
 	ftrace_init();
@@ -973,6 +983,7 @@ void start_kernel(void)
 	 * timer interrupt). Full topology setup happens at smp_init()
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
+	tsi_mark_c(0x35);
 	sched_init();
 
 	if (WARN(!irqs_disabled(),
@@ -1004,7 +1015,9 @@ void start_kernel(void)
 
 	context_tracking_init();
 	/* init some links before init_ISA_irqs() */
+	tsi_mark_c(0x36);
 	early_irq_init();
+	tsi_mark_c(0x37);
 	init_IRQ();
 	tick_init();
 	rcu_init_nohz();
@@ -1012,8 +1025,11 @@ void start_kernel(void)
 	srcu_init();
 	hrtimers_init();
 	softirq_init();
+	tsi_mark_c(0x38);
 	timekeeping_init();
+	tsi_mark_c(0x39);
 	time_init();
+	tsi_mark_c(0x3a);
 
 	/* This must be after timekeeping is initialized */
 	random_init();
@@ -1037,7 +1053,9 @@ void start_kernel(void)
 	 * we've done PCI setups etc, and console_init() must be aware of
 	 * this. But we do want output early, in case something goes wrong.
 	 */
+	tsi_mark_c(0x3b);
 	console_init();
+	tsi_mark_c(0x3c);
 	if (panic_later)
 		panic("Too many boot %s vars at `%s'", panic_later,
 		      panic_param);
@@ -1102,6 +1120,7 @@ void start_kernel(void)
 	kcsan_init();
 
 	/* Do the rest non-__init'ed, we're now alive */
+	tsi_mark_c(0x3d);
 	rest_init();
 
 	/*

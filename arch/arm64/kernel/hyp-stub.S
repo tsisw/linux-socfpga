@@ -15,6 +15,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/ptrace.h>
 #include <asm/virt.h>
+#include <asm/tsi_diag.h>
 
 	.text
 	.pushsection	.hyp.text, "ax"
@@ -185,20 +186,24 @@ SYM_CODE_END(enter_vhe)
 
 	.popsection
 
-.macro invalid_vector	label
+/*
+ * The stock stub spins here with nothing recorded, which on a bring-up board
+ * looks exactly like a wedged bus. Save the syndrome first, then park.
+ */
+.macro invalid_vector	label, idx
 SYM_CODE_START_LOCAL(\label)
-	b \label
+	tsi_rec_vec	tsi_el2_rec, \idx, el2, 0x54534932
 SYM_CODE_END(\label)
 .endm
 
-	invalid_vector	el2_sync_invalid
-	invalid_vector	el2_irq_invalid
-	invalid_vector	el2_fiq_invalid
-	invalid_vector	el2_error_invalid
-	invalid_vector	el1_sync_invalid
-	invalid_vector	el1_irq_invalid
-	invalid_vector	el1_fiq_invalid
-	invalid_vector	el1_error_invalid
+	invalid_vector	el2_sync_invalid, 0
+	invalid_vector	el2_irq_invalid, 1
+	invalid_vector	el2_fiq_invalid, 2
+	invalid_vector	el2_error_invalid, 3
+	invalid_vector	el1_sync_invalid, 4
+	invalid_vector	el1_irq_invalid, 5
+	invalid_vector	el1_fiq_invalid, 6
+	invalid_vector	el1_error_invalid, 7
 
 	.popsection
 
