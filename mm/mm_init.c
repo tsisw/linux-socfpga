@@ -880,7 +880,16 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 	}
 #endif
 
+	/*
+	 * TSI pro-FPGA bring-up: the boot stops inside this loop and halving the
+	 * memory node did not move it, so it is a stall and not duration. Mark
+	 * every 4096 pages: a trail that keeps growing means it is grinding, a
+	 * trail that stops names the page it stopped on.
+	 */
+	tsi_mark_c(0x7c);
 	for (pfn = start_pfn; pfn < end_pfn; ) {
+		if ((pfn & 0xfff) == 0)
+			tsi_mark_c(0x7b);
 		/*
 		 * There can be holes in boot-time mem_map[]s handed to this
 		 * function.  They do not exist on hotplugged memory.
