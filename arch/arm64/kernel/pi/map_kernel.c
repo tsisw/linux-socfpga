@@ -313,12 +313,15 @@ asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 	tsi_pi_mark(0x42);
 
 	/*
-	 * Now exercise the library memset on a range we just cleared by hand. If the
-	 * trail stops between these two marks, DC ZVA is the thing that hangs.
+	 * The library memset used to be exercised here to see whether DC ZVA hangs.
+	 * It does, on this board, when it is the first cached write traffic after
+	 * reset: with BL31 no longer touching DDR before the handoff, the boot
+	 * stopped at the mark before this call and never reached the one after it,
+	 * while the plain-store chunks above completed. Left out rather than left
+	 * in, because it blocks the boot and the chunked clear above does the work.
+	 * The finding itself matters: the stock kernel clears BSS with this same
+	 * memset, so the loop above is a workaround, not just instrumentation.
 	 */
-	tsi_pi_mark(0x60);
-	memset(__bss_start, 0, 64 * 1024);
-	tsi_pi_mark(0x61);
 
 	/* Parse the command line for CPU feature overrides */
 	chosen = fdt_path_offset(fdt, chosen_str);
