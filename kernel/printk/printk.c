@@ -525,25 +525,6 @@ static struct latched_seq clear_seq = {
 #define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
 #define LOG_BUF_LEN_MAX ((u32)1 << 31)
 static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
-
-/*
- * TSI pro-FPGA bring-up: the board has no kernel console yet and the host
- * reads DDR through a backdoor that does not see the CPU caches, so the log
- * buffer is cleaned to the point of coherency after every message. The first
- * 16 KiB is all of early boot and keeps the cost bounded.
- */
-#ifdef CONFIG_ARM64
-extern void dcache_clean_poc(unsigned long start, unsigned long end);
-static inline void tsi_log_flush(void)
-{
-	unsigned long len = __LOG_BUF_LEN < 16384 ? __LOG_BUF_LEN : 16384;
-
-	dcache_clean_poc((unsigned long)__log_buf,
-			 (unsigned long)__log_buf + len);
-}
-#else
-static inline void tsi_log_flush(void) { }
-#endif
 static char *log_buf = __log_buf;
 static u32 log_buf_len = __LOG_BUF_LEN;
 
@@ -2400,7 +2381,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 	printk_delay(level);
 
 	printed_len = vprintk_store(facility, level, dev_info, fmt, args);
-	tsi_log_flush();
 
 	if (ft.nbcon_atomic)
 		nbcon_atomic_flush_pending();

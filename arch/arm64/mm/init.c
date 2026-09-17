@@ -325,24 +325,6 @@ void __init bootmem_init(void)
 	max_pfn = max_low_pfn = max;
 	min_low_pfn = min;
 
-	/*
-	 * Print it unconditionally: if the kernel image is not covered by a
-	 * reserved region here, every later overwrite follows from that, and we
-	 * want to see it whether or not an allocation happens to land badly.
-	 */
-	{
-		int i;
-
-		pr_info("TSI: kernel image %llx..%llx, memstart %llx\n",
-			(unsigned long long)__pa_symbol(_text),
-			(unsigned long long)__pa_symbol(_end),
-			(unsigned long long)memstart_addr);
-		for (i = 0; i < memblock.reserved.cnt; i++)
-			pr_info("TSI: reserved[%d] %llx..%llx\n", i,
-				(unsigned long long)memblock.reserved.regions[i].base,
-				(unsigned long long)(memblock.reserved.regions[i].base +
-						     memblock.reserved.regions[i].size));
-	}
 	tsi_mark_c(0x70);
 	arch_numa_init();
 
@@ -365,22 +347,6 @@ void __init bootmem_init(void)
 	tsi_mark_c(0x72);
 	sparse_init();
 	tsi_mark_c(0x73);
-
-	/*
-	 * Dump the reservations again. The list printed above is taken before
-	 * sparse_init, so it cannot show the per-section page metadata blocks,
-	 * and those are exactly what the boot stops on. Printed here they can
-	 * be matched against the vmemmap lines from arch/arm64/mm/mmu.c.
-	 */
-	{
-		int i;
-
-		for (i = 0; i < memblock.reserved.cnt; i++)
-			pr_info("TSI: post-sparse reserved[%d] %llx..%llx\n", i,
-				(unsigned long long)memblock.reserved.regions[i].base,
-				(unsigned long long)(memblock.reserved.regions[i].base +
-						     memblock.reserved.regions[i].size));
-	}
 	zone_sizes_init();
 	tsi_mark_c(0x74);
 

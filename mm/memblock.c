@@ -1487,45 +1487,6 @@ again:
 	return 0;
 
 done:
-#ifdef CONFIG_ARM64
-	/*
-	 * TSI pro-FPGA bring-up. DDR has been cleared by three board tests: a
-	 * cached write-back burst test passes, the loaded image survives ten
-	 * idle minutes byte exact, and nothing decays while the controller is
-	 * hammered elsewhere. So when the kernel image gets overwritten minutes
-	 * into a boot, the kernel is doing it, and the only way that happens is
-	 * an allocator handing out memory the image already occupies. Check it
-	 * here rather than at early_pgtable_alloc, because this is the one point
-	 * every memblock allocation passes through -- including the page
-	 * metadata array, which the earlier guard did not cover and which is
-	 * allocated immediately before the crash we are chasing.
-	 */
-	{
-		static int tsi_said_it;
-		phys_addr_t ks = __pa_symbol(_text), ke = __pa_symbol(_end);
-
-		if ((found < ke) && ((found + size) > ks) && !tsi_said_it++) {
-			int i;
-
-			pr_err("TSI: memblock gave out %llx..%llx, INSIDE the kernel image [%llx,%llx)\n",
-			       (unsigned long long)found,
-			       (unsigned long long)(found + size),
-			       (unsigned long long)ks, (unsigned long long)ke);
-			for (i = 0; i < memblock.memory.cnt; i++)
-				pr_err("TSI:   memory[%d]   %llx..%llx\n", i,
-				       (unsigned long long)memblock.memory.regions[i].base,
-				       (unsigned long long)(memblock.memory.regions[i].base +
-							    memblock.memory.regions[i].size));
-			for (i = 0; i < memblock.reserved.cnt; i++)
-				pr_err("TSI:   reserved[%d] %llx..%llx\n", i,
-				       (unsigned long long)memblock.reserved.regions[i].base,
-				       (unsigned long long)(memblock.reserved.regions[i].base +
-							    memblock.reserved.regions[i].size));
-			pr_err("TSI:   reserved.cnt %lu of %lu (the static array cannot grow before memblock_allow_resize)\n",
-			       memblock.reserved.cnt, memblock.reserved.max);
-		}
-	}
-#endif
 	/*
 	 * Skip kmemleak for those places like kasan_init() and
 	 * early_pgtable_alloc() due to high volume.

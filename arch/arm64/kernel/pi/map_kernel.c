@@ -281,11 +281,13 @@ asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 	tsi_pi_mark(0x41);
 
 	/*
-	 * Clear BSS and the initial page tables. Written as a marked loop of plain
-	 * stores rather than one memset call: run 11 hung somewhere in this clear
-	 * with no exception, and the library memset uses DC ZVA, so this separates
-	 * "the memory will not take stores" from "that instruction does not work".
-	 * The trail lives in .data, above __bss_start, so the clear cannot erase it.
+	 * Clear BSS and the initial page tables.
+	 *
+	 * WORKAROUND, not instrumentation. memset() hangs here: DCZID_EL0 reads
+	 * 0x4 so arch/arm64/lib/memset.S takes its DC ZVA path, and the boot
+	 * stops inside it with no exception and no console. Plain stores work.
+	 * Chunked only so the marks show how far it got. The trail is in .data,
+	 * above __bss_start, so this cannot erase it.
 	 */
 	tsi_pi_info();
 	{
@@ -311,17 +313,6 @@ asmlinkage void __init early_map_kernel(u64 boot_status, void *fdt)
 		}
 	}
 	tsi_pi_mark(0x42);
-
-	/*
-	 * The library memset used to be exercised here to see whether DC ZVA hangs.
-	 * It does, on this board, when it is the first cached write traffic after
-	 * reset: with BL31 no longer touching DDR before the handoff, the boot
-	 * stopped at the mark before this call and never reached the one after it,
-	 * while the plain-store chunks above completed. Left out rather than left
-	 * in, because it blocks the boot and the chunked clear above does the work.
-	 * The finding itself matters: the stock kernel clears BSS with this same
-	 * memset, so the loop above is a workaround, not just instrumentation.
-	 */
 
 	/* Parse the command line for CPU feature overrides */
 	chosen = fdt_path_offset(fdt, chosen_str);

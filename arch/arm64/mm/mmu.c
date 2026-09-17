@@ -38,7 +38,6 @@
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
 #include <asm/ptdump.h>
-#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/pgalloc.h>
 #include <asm/kfence.h>
@@ -116,51 +115,6 @@ static phys_addr_t __init early_pgtable_alloc(int shift)
 					 MEMBLOCK_ALLOC_NOLEAKTRACE);
 	if (!phys)
 		panic("Failed to allocate page table page\n");
-
-	/*
-	 * TSI pro-FPGA bring-up. On this board an early page table was handed
-	 * out from a page inside the kernel image and overwrote .rodata, which
-	 * only surfaced much later as a wild pointer read out of __jump_table.
-	 * The image is reserved with memblock_reserve() in arm64_memblock_init,
-	 * so this must never fire; say so loudly at the point where the
-	 * allocator is still the only suspect, rather than at the crash.
-	 */
-	if (phys >= __pa_symbol(_text) && phys < __pa_symbol(_end)) {
-		static int tsi_said_it;
-		int i;
-
-		if (!tsi_said_it++) {
-			pr_err("TSI: early_pgtable_alloc returned %llx, INSIDE the kernel image [%llx,%llx)\n",
-			       (unsigned long long)phys,
-			       (unsigned long long)__pa_symbol(_text),
-			       (unsigned long long)__pa_symbol(_end));
-			pr_err("TSI: memstart_addr %llx kimage_voffset %llx PAGE_OFFSET %llx\n",
-			       (unsigned long long)memstart_addr,
-			       (unsigned long long)kimage_voffset,
-			       (unsigned long long)PAGE_OFFSET);
-			/*
-			 * Print the lists directly: memblock_dump_all() is a
-			 * no-op without memblock=debug, and that option costs
-			 * hundreds of printks on a board this slow.
-			 */
-			for (i = 0; i < memblock.memory.cnt; i++)
-				pr_err("TSI:   memory[%d]   %llx..%llx flags %x\n", i,
-				       (unsigned long long)memblock.memory.regions[i].base,
-				       (unsigned long long)(memblock.memory.regions[i].base +
-							    memblock.memory.regions[i].size),
-				       (unsigned int)memblock.memory.regions[i].flags);
-			for (i = 0; i < memblock.reserved.cnt; i++)
-				pr_err("TSI:   reserved[%d] %llx..%llx flags %x\n", i,
-				       (unsigned long long)memblock.reserved.regions[i].base,
-				       (unsigned long long)(memblock.reserved.regions[i].base +
-							    memblock.reserved.regions[i].size),
-				       (unsigned int)memblock.reserved.regions[i].flags);
-			pr_err("TSI:   memory.cnt %lu/%lu reserved.cnt %lu/%lu current_limit %llx\n",
-			       memblock.memory.cnt, memblock.memory.max,
-			       memblock.reserved.cnt, memblock.reserved.max,
-			       (unsigned long long)memblock.current_limit);
-		}
-	}
 
 	return phys;
 }
@@ -1205,47 +1159,15 @@ static void free_empty_tables(unsigned long addr, unsigned long end,
 }
 #endif
 
-/*
- * TSI pro-FPGA bring-up knob, default 0 so the kernel behaves exactly as it did
- * on commit 26d103480 unless the boot arguments ask otherwise:
- *   bit 0  clean the descriptor we just wrote out to the point of coherency
- *   bit 1  invalidate any translation cached for the range it maps
- * The architecture lets us stop at the barrier inside set_pmd because the table
- * walker snoops the data cache. This platform has already been caught sending a
- * dirty line to the wrong physical address, so that assumption is worth testing
- * rather than trusting. Pass tsi_vmemmap_fix=3 to do both.
- */
-int tsi_vmemmap_fix __read_mostly;
-
-static int __init tsi_vmemmap_fix_setup(char *str)
-{
-	if (!str || kstrtoint(str, 0, &tsi_vmemmap_fix))
-		tsi_vmemmap_fix = 3;
-	return 0;
-}
-early_param("tsi_vmemmap_fix", tsi_vmemmap_fix_setup);
-
 void __meminit vmemmap_set_pmd(pmd_t *pmdp, void *p, int node,
 			       unsigned long addr, unsigned long next)
 {
 	pmd_set_huge(pmdp, __pa(p), __pgprot(PROT_SECT_NORMAL));
 
-	/*
-	 * One line per section. This is the only place that says which physical
-	 * 2 MiB block backs each section of the page metadata, and the board
-	 * stops on the first store into the second one.
-	 */
-	pr_info("TSI: vmemmap %lx..%lx pa %llx pmdp %px pmd %llx fix %d\n",
+	/* which physical block backs each section; they move between builds */
+	pr_info("TSI: vmemmap %lx..%lx pa %llx pmdp %px pmd %llx\n",
 		addr, next, (unsigned long long)__pa(p), pmdp,
-		(unsigned long long)pmd_val(READ_ONCE(*pmdp)), tsi_vmemmap_fix);
-
-	if (tsi_vmemmap_fix & 1) {
-		dcache_clean_inval_poc((unsigned long)pmdp,
-				       (unsigned long)pmdp + sizeof(*pmdp));
-		dsb(ish);
-	}
-	if (tsi_vmemmap_fix & 2)
-		flush_tlb_kernel_range(addr, next);
+		(unsigned long long)pmd_val(READ_ONCE(*pmdp)));
 }
 
 int __meminit vmemmap_check_pmd(pmd_t *pmdp, int node,
