@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config USB_SOC_DRD
+	tristate "SOC USB3 DRD Core Support"
+	depends on (USB || USB_GADGET) && HAS_DMA
+	depends on (EXTCON || EXTCON=n)
+	select USB_XHCI_PLATFORM if USB_XHCI_HCD
+	select USB_ROLE_SWITCH if USB_SOC_DRD_DUAL_ROLE
+	help
+	  Say Y or M here if your system has a Dual Role SuperSpeed
+	  USB controller based on the SOC USB3 IP Core.
+
+	  If you choose to build this driver as a dynamically linked
+	  module, the module will be called soc_usb.ko.
+
+if USB_SOC_DRD
+
+choice
+	bool "SOC USB Mode Selection"
+	default USB_SOC_DRD_HOST if (USB && !USB_GADGET)
+	default USB_SOC_DRD_GADGET if (!USB && USB_GADGET)
+
+config USB_SOC_DRD_HOST
+	bool "Host only mode"
+	depends on USB=y || USB=USB_SOC_DRD
+	help
+	  Select this when you want to use SOC USB in host mode only,
+	  thereby the gadget feature will be regressed.
+
+config USB_SOC_DRD_GADGET
+	bool "Gadget only mode"
+	depends on USB_GADGET=y || USB_GADGET=USB_SOC_DRD
+	help
+	  Select this when you want to use SOC USB in gadget mode only,
+	  thereby the host feature will be regressed.
+
+config USB_SOC_DRD_DUAL_ROLE
+	bool "Dual Role mode"
+	depends on ((USB=y || USB=USB_SOC_DRD) && (USB_GADGET=y || USB_GADGET=USB_SOC_DRD))
+	depends on (EXTCON=y || EXTCON=USB_SOC_DRD)
+	help
+	  This is the default mode of working of SOC USB3 controller where
+	  both host and gadget features are enabled.
+
+endchoice
+
+endif
