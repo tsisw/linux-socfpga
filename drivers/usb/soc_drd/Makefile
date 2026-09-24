@@ -21,3 +21,6 @@ endif
 ifneq ($(CONFIG_DEBUG_FS),)
 	soc_usb-y				+= soc_debugfs.o
 endif
+
+obj-$(CONFIG_USB_SOC_DRD_SKYLP)			+= soc_skylp_core.o
+obj-$(CONFIG_USB_SOC_DRD_SKYLP_KUNIT_TEST)	+= soc_skylp-test.o

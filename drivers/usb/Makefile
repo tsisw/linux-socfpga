@@ -11,6 +11,7 @@ obj-$(CONFIG_USB_SUPPORT)	+= phy/
 
 obj-$(CONFIG_USB_DWC3)		+= dwc3/
 obj-$(CONFIG_USB_SOC_DRD)	+= soc_drd/
+obj-$(CONFIG_USB_SOC_DRD_SKYLP)	+= soc_drd/
 obj-$(CONFIG_USB_DWC2)		+= dwc2/
 obj-$(CONFIG_USB_ISP1760)	+= isp1760/
 

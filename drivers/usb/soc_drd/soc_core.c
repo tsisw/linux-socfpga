@@ -33,6 +33,7 @@
 #include "soc_core.h"
 #include "soc_gadget.h"
 #include "soc_io.h"
+#include "soc_skylp.h"
 
 #include "soc_debug.h"
 
@@ -1069,7 +1070,12 @@ static int  soc_usb_clk_phy_init(struct platform_device *pdev)
 	/* setp 9 */
 	/* read usb3 phy pll register  */
 
-	return 0;
+	/*
+	 * TSI SkyLP ("tsi,skylp-usb"): TSAR release, refclk select and the
+	 * mandatory Type-C lane-mux write; nodes without that compatible
+	 * return 0 untouched.
+	 */
+	return tsi_skylp_usb_init(&pdev->dev);
 }
 
 
@@ -1081,7 +1087,9 @@ static int soc_usb_probe(struct platform_device *pdev)
 	struct soc_usb		*su;
 	int			ret;
 
-	soc_usb_clk_phy_init(pdev);
+	ret = soc_usb_clk_phy_init(pdev);
+	if (ret)
+		return ret;
 
 	su = devm_kzalloc(dev, sizeof(*su), GFP_KERNEL);
 	if (!su)
