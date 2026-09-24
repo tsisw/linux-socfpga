@@ -10,6 +10,7 @@
  */
 
 #include <linux/bits.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/errno.h>
@@ -120,9 +121,22 @@ int tsi_skylp_usb_init(struct device *dev)
 		.wr = tsi_skylp_iomem_wr,
 		.delay_us = tsi_skylp_iomem_delay,
 	};
+	struct clk_bulk_data *clks;
+	int ret;
 
 	if (!np || !of_device_is_compatible(np, "tsi,skylp-usb"))
 		return 0;
+
+	/*
+	 * soc_drd itself consumes no clocks at all (gap G8) - unlike dwc3,
+	 * which does a clk_bulk_get. Enable whatever the DT lists for this
+	 * node before the sequence runs, and hold them for the device's
+	 * lifetime. A node with no clocks property is a no-op, which is the
+	 * case until the UDI clock topology is confirmed (HW-27).
+	 */
+	ret = devm_clk_bulk_get_all_enable(dev, &clks);
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "failed to enable clocks\n");
 
 	io = devm_kzalloc(dev, sizeof(*io), GFP_KERNEL);
 	if (!io)
