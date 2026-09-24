@@ -64,12 +64,18 @@ config USB_SOC_DRD_SKYLP_TYPEC
 	tristate "TSI SkyLP Type-C plug/orientation glue"
 	depends on USB_SOC_DRD_SKYLP
 	depends on GPIOLIB
+	depends on TYPEC
 	default USB_SOC_DRD
 	help
-	  Follows the PD controller's plug/orientation GPIO lines (TI
-	  TPS25730D on the Helix-M board) and keeps the SkyLP Type-C
-	  lane mux's flip bit in sync. Without it the mux keeps the
-	  boot-time orientation and a flipped cable trains no link.
+	  Drives the SkyLP Type-C lane mux. Registers a standard Type-C
+	  orientation switch and mode mux, so a port manager on a
+	  source-capable board can drive it with no SkyLP-specific code,
+	  and additionally follows the PD controller's plug/orientation
+	  GPIO lines (TI TPS25730D on the Helix-M board) where the board
+	  routes them to the SoC.
+
+	  Without it the mux keeps its reset value, which is "no
+	  connection", and no USB3 link can train.
 
 config USB_SOC_DRD_SKYLP_KUNIT_TEST
 	tristate "KUnit tests for the TSI SkyLP init-sequence core" if !KUNIT_ALL_TESTS

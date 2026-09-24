@@ -19,6 +19,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/usb/typec_altmode.h>
+#include <linux/usb/typec_dp.h>
 
 #include "soc_skylp.h"
 
@@ -74,6 +76,30 @@ bool tsi_skylp_mux_update(struct tsi_skylp_mux_cache *cache,
 	return true;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_mux_update);
+
+int tsi_skylp_mux_mode_from_typec(unsigned long typec_mode, u32 *mux_mode)
+{
+	switch (typec_mode) {
+	case TYPEC_STATE_SAFE:
+		*mux_mode = TSI_SKYLP_MUX_MODE_NONE;
+		return 0;
+	case TYPEC_STATE_USB:
+		*mux_mode = TSI_SKYLP_MUX_MODE_USB;
+		return 0;
+	/* Pin assignments C and E carry four DP lanes, no USB3. */
+	case TYPEC_DP_STATE_C:
+	case TYPEC_DP_STATE_E:
+		*mux_mode = TSI_SKYLP_MUX_MODE_4DP;
+		return 0;
+	/* D keeps USB3 on one pair alongside two DP lanes. */
+	case TYPEC_DP_STATE_D:
+		*mux_mode = TSI_SKYLP_MUX_MODE_USB_2DP;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_mux_mode_from_typec);
 
 /* Binder: DT + MMIO plumbing over the tested sequence core. */
 

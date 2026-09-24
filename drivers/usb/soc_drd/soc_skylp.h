@@ -74,6 +74,14 @@ bool tsi_skylp_mux_update(struct tsi_skylp_mux_cache *cache,
 			  const struct tsi_skylp_hw *hw,
 			  u32 mode, bool flip);
 
+/*
+ * Translate a Type-C mode-switch state (TYPEC_STATE_* / TYPEC_DP_STATE_*)
+ * into a lane-mux mode, so a port manager can drive this mux without any
+ * SkyLP-specific knowledge. Leaves *mux_mode untouched and returns
+ * -EINVAL for states the mux cannot represent.
+ */
+int tsi_skylp_mux_mode_from_typec(unsigned long typec_mode, u32 *mux_mode);
+
 struct device;
 
 /*

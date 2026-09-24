@@ -19,6 +19,8 @@
  */
 
 #include <kunit/test.h>
+#include <linux/usb/typec_altmode.h>
+#include <linux/usb/typec_dp.h>
 
 #include "soc_skylp.h"
 
@@ -201,6 +203,70 @@ static void skylp_test_mux_update_writes_only_on_change(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, log.ops[1].val, 0x17000u);
 }
 
+/*
+ * The four mux modes map exactly onto the Type-C states the kernel's
+ * mode-switch passes down, so a port manager can drive this mux with no
+ * SkyLP-specific knowledge. DP pin assignments: C and E are 4-lane DP,
+ * D is 2-lane DP alongside USB3.
+ */
+static void skylp_test_typec_state_safe_is_no_connection(struct kunit *test)
+{
+	u32 mode = 0xff;
+
+	KUNIT_EXPECT_EQ(test,
+			tsi_skylp_mux_mode_from_typec(TYPEC_STATE_SAFE, &mode),
+			0);
+	KUNIT_EXPECT_EQ(test, mode, (u32)TSI_SKYLP_MUX_MODE_NONE);
+}
+
+static void skylp_test_typec_state_usb(struct kunit *test)
+{
+	u32 mode = 0xff;
+
+	KUNIT_EXPECT_EQ(test,
+			tsi_skylp_mux_mode_from_typec(TYPEC_STATE_USB, &mode),
+			0);
+	KUNIT_EXPECT_EQ(test, mode, (u32)TSI_SKYLP_MUX_MODE_USB);
+}
+
+static void skylp_test_typec_dp_four_lane(struct kunit *test)
+{
+	u32 mode = 0xff;
+
+	KUNIT_EXPECT_EQ(test,
+			tsi_skylp_mux_mode_from_typec(TYPEC_DP_STATE_C, &mode),
+			0);
+	KUNIT_EXPECT_EQ(test, mode, (u32)TSI_SKYLP_MUX_MODE_4DP);
+
+	mode = 0xff;
+	KUNIT_EXPECT_EQ(test,
+			tsi_skylp_mux_mode_from_typec(TYPEC_DP_STATE_E, &mode),
+			0);
+	KUNIT_EXPECT_EQ(test, mode, (u32)TSI_SKYLP_MUX_MODE_4DP);
+}
+
+/* pin assignment D keeps USB3 alive alongside two DP lanes */
+static void skylp_test_typec_dp_two_lane_keeps_usb(struct kunit *test)
+{
+	u32 mode = 0xff;
+
+	KUNIT_EXPECT_EQ(test,
+			tsi_skylp_mux_mode_from_typec(TYPEC_DP_STATE_D, &mode),
+			0);
+	KUNIT_EXPECT_EQ(test, mode, (u32)TSI_SKYLP_MUX_MODE_USB_2DP);
+}
+
+/* an unsupported alt mode must be refused, not silently mapped */
+static void skylp_test_typec_unknown_mode_rejected(struct kunit *test)
+{
+	u32 mode = 0xff;
+
+	KUNIT_EXPECT_EQ(test,
+			tsi_skylp_mux_mode_from_typec(TYPEC_DP_STATE_A, &mode),
+			-EINVAL);
+	KUNIT_EXPECT_EQ(test, mode, 0xffu);
+}
+
 static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_mux_val_usb),
 	KUNIT_CASE(skylp_test_mux_val_usb_flipped),
@@ -210,6 +276,11 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_seq_tsar_only_keeps_settle),
 	KUNIT_CASE(skylp_test_seq_rejects_bad_mode),
 	KUNIT_CASE(skylp_test_mux_update_writes_only_on_change),
+	KUNIT_CASE(skylp_test_typec_state_safe_is_no_connection),
+	KUNIT_CASE(skylp_test_typec_state_usb),
+	KUNIT_CASE(skylp_test_typec_dp_four_lane),
+	KUNIT_CASE(skylp_test_typec_dp_two_lane_keeps_usb),
+	KUNIT_CASE(skylp_test_typec_unknown_mode_rejected),
 	{}
 };
 

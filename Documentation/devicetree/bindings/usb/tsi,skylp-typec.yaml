@@ -10,18 +10,32 @@ maintainers:
   - Mahesh Babu <maheshbabu@tsavoritesi.com>
 
 description: |
-  Glue between a board's autonomous USB PD controller and the TSI SkyLP
-  Type-C lane mux. On the Helix-M board a TI TPS25730D resolves plug
-  state and cable orientation on its own and reports them on two GPIO
-  lines (USB_PLUG_EVENT, USB_PLUG_FLIP) wired to SkyLP GPIO pads; this
-  node follows those lines and keeps the lane mux's flip bit in sync.
-  The lines are polled, since the SkyLP GPIO interrupt path is
-  level-only and the pad routing is not yet confirmed.
+  Driver for the TSI SkyLP Type-C lane mux. The mux register selects the
+  lane mode (USB 3.2, USB + 2-lane DisplayPort, or 4-lane DisplayPort)
+  and the cable orientation, so this node is both a Type-C mode switch
+  and an orientation switch.
 
-  Both GPIOs are optional. Without them the node programs a fixed
-  orientation once at probe. The mux word sits inside the DP/PHY APB
-  window the tsi,skylp-dp node claims, so it is mapped without claiming
-  a region.
+  On a board with a Type-C port manager, add "mode-switch",
+  "orientation-switch" and the "port" graph link; the port manager then
+  drives the mux through the usual Type-C interfaces and no other
+  properties are needed.
+
+  Helix-M has no port manager: it has no TCPC, and its TI TPS25730D PD
+  controller is autonomous and sink-only. There the mux is driven from
+  the board's own signals instead - the PD controller reports plug state
+  and cable orientation on GPIO lines, and this node follows whichever of
+  them the board routes to the SoC. They are polled, because the SkyLP
+  GPIO interrupt path is level-only and the pad routing is unconfirmed.
+  Note that on Helix-M only the plug-event line reaches the SoC; the
+  orientation line terminates on the board CPLD, so the mux necessarily
+  runs at a fixed orientation.
+
+  With neither the switch properties nor the GPIOs, the node programs a
+  fixed mode and orientation once at probe - which is still mandatory,
+  because the mux resets to "no connection".
+
+  The mux word sits inside the DP/PHY APB window the DP node claims, so
+  it is mapped without claiming a region.
 
 properties:
   compatible:
@@ -46,9 +60,28 @@ properties:
     enum: [0, 1, 2, 3]
     default: 1
     description:
-      Type-C lane-mux mode to hold while updating the flip bit. 1 =
-      USB3.2 Gen2x2, 2 = USB3.2 + 2-lane DisplayPort, 3 = 4-lane
-      DisplayPort.
+      Initial Type-C lane-mux mode, and the mode held while updating the
+      flip bit when no port manager is present. 0 = no connection (the
+      reset value), 1 = USB3.2 Gen2x2, 2 = USB3.2 + 2-lane DisplayPort,
+      3 = 4-lane DisplayPort. A port manager overrides this at runtime.
+
+  mode-switch:
+    type: boolean
+    description:
+      Present when a Type-C port manager drives the lane mode through
+      this node. Requires "port".
+
+  orientation-switch:
+    type: boolean
+    description:
+      Present when a Type-C port manager drives the cable orientation
+      through this node. Requires "port".
+
+  port:
+    $ref: /schemas/graph.yaml#/properties/port
+    description:
+      Graph link to the Type-C controller that drives the mode and
+      orientation switches. Absent on boards without a port manager.
 
 required:
   - compatible

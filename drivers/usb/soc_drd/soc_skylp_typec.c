@@ -22,8 +22,10 @@
 #include <linux/io.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/usb/typec_mux.h>
 #include <linux/workqueue.h>
 
 #include "soc_skylp.h"
@@ -35,11 +37,15 @@ struct skylp_typec {
 	void __iomem *mux;
 	struct tsi_skylp_hw hw;
 	struct tsi_skylp_mux_cache cache;
+	struct mutex lock;		/* serialises mode/flip against apply */
 	u32 mode;
+	bool flip;
 	struct gpio_desc *plug_event;
 	struct gpio_desc *plug_flip;
 	bool present;
 	struct delayed_work work;
+	struct typec_switch_dev *sw;
+	struct typec_mux_dev *mux_dev;
 };
 
 static void skylp_typec_wr(void *ctx, enum tsi_skylp_reg reg, u32 val)
@@ -49,14 +55,59 @@ static void skylp_typec_wr(void *ctx, enum tsi_skylp_reg reg, u32 val)
 	writel(val, st->mux);
 }
 
+/* Single writer for the mux word; caller holds the lock. */
+static void skylp_typec_apply(struct skylp_typec *st)
+{
+	lockdep_assert_held(&st->lock);
+
+	if (tsi_skylp_mux_update(&st->cache, &st->hw, st->mode, st->flip))
+		dev_dbg(st->dev, "lane mux set: mode %u, %s orientation\n",
+			st->mode, st->flip ? "flipped" : "normal");
+}
+
+/*
+ * Orientation from a port manager. On Helix-M nothing calls this: the PD
+ * controller's flip output stops at the board CPLD, so the mux runs at
+ * the fixed orientation below. A board that routes orientation to a port
+ * manager drives this path instead, with no change here.
+ */
+static int skylp_typec_switch_set(struct typec_switch_dev *sw,
+				  enum typec_orientation orientation)
+{
+	struct skylp_typec *st = typec_switch_get_drvdata(sw);
+
+	guard(mutex)(&st->lock);
+	st->flip = orientation == TYPEC_ORIENTATION_REVERSE;
+	skylp_typec_apply(st);
+	return 0;
+}
+
+/* Mode from a port manager: USB, USB+2-lane DP, or 4-lane DP. */
+static int skylp_typec_mux_set(struct typec_mux_dev *mux,
+			       struct typec_mux_state *state)
+{
+	struct skylp_typec *st = typec_mux_get_drvdata(mux);
+	u32 mode;
+	int ret;
+
+	ret = tsi_skylp_mux_mode_from_typec(state->mode, &mode);
+	if (ret)
+		return ret;
+
+	guard(mutex)(&st->lock);
+	st->mode = mode;
+	skylp_typec_apply(st);
+	return 0;
+}
+
 static void skylp_typec_sync(struct skylp_typec *st)
 {
-	bool flip = st->plug_flip ?
-		    gpiod_get_value_cansleep(st->plug_flip) : false;
+	guard(mutex)(&st->lock);
 
-	if (tsi_skylp_mux_update(&st->cache, &st->hw, st->mode, flip))
-		dev_info(st->dev, "lane mux set: mode %u, %s orientation\n",
-			 st->mode, flip ? "flipped" : "normal");
+	if (st->plug_flip)
+		st->flip = gpiod_get_value_cansleep(st->plug_flip);
+
+	skylp_typec_apply(st);
 
 	if (st->plug_event) {
 		bool present = gpiod_get_value_cansleep(st->plug_event);
@@ -85,6 +136,54 @@ static void skylp_typec_stop_poll(void *data)
 	cancel_delayed_work_sync(&st->work);
 }
 
+static void skylp_typec_unreg_switch(void *data)
+{
+	typec_switch_unregister(data);
+}
+
+static void skylp_typec_unreg_mux(void *data)
+{
+	typec_mux_unregister(data);
+}
+
+/*
+ * Register as a standard orientation switch and mode mux. Nothing on
+ * Helix-M drives them today - there is no port manager, because the board
+ * has no TCPC and its PD controller is autonomous - but this is the
+ * interface a port manager uses, so a source-capable board needs no
+ * change here.
+ */
+static int skylp_typec_register_mux(struct skylp_typec *st)
+{
+	struct typec_switch_desc sw_desc = {
+		.fwnode = dev_fwnode(st->dev),
+		.set = skylp_typec_switch_set,
+		.drvdata = st,
+	};
+	struct typec_mux_desc mux_desc = {
+		.fwnode = dev_fwnode(st->dev),
+		.set = skylp_typec_mux_set,
+		.drvdata = st,
+	};
+	int ret;
+
+	st->sw = typec_switch_register(st->dev, &sw_desc);
+	if (IS_ERR(st->sw))
+		return dev_err_probe(st->dev, PTR_ERR(st->sw),
+				     "failed to register orientation switch\n");
+	ret = devm_add_action_or_reset(st->dev, skylp_typec_unreg_switch,
+				       st->sw);
+	if (ret)
+		return ret;
+
+	st->mux_dev = typec_mux_register(st->dev, &mux_desc);
+	if (IS_ERR(st->mux_dev))
+		return dev_err_probe(st->dev, PTR_ERR(st->mux_dev),
+				     "failed to register mode mux\n");
+	return devm_add_action_or_reset(st->dev, skylp_typec_unreg_mux,
+					st->mux_dev);
+}
+
 static int skylp_typec_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -98,6 +197,9 @@ static int skylp_typec_probe(struct platform_device *pdev)
 	st->dev = dev;
 	st->hw.wr = skylp_typec_wr;
 	st->hw.ctx = st;
+	ret = devm_mutex_init(dev, &st->lock);
+	if (ret)
+		return ret;
 
 	/*
 	 * The mux word sits inside the DP/PHY APB window the dptx driver
@@ -126,6 +228,10 @@ static int skylp_typec_probe(struct platform_device *pdev)
 				     "plug-flip gpio\n");
 
 	skylp_typec_sync(st);
+
+	ret = skylp_typec_register_mux(st);
+	if (ret)
+		return ret;
 
 	if (st->plug_event || st->plug_flip) {
 		INIT_DELAYED_WORK(&st->work, skylp_typec_poll);
