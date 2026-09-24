@@ -54,7 +54,8 @@ struct tsi_intc {
 	struct irq_domain	*domain;
 };
 
-#if IS_ENABLED(CONFIG_TSI_SKYLP_INTC_KUNIT_TEST)
+/* VISIBLE_IF_KUNIT is keyed on CONFIG_KUNIT, so the prototypes must be too. */
+#if IS_ENABLED(CONFIG_KUNIT)
 void tsi_intc_irq_mask_hw(struct tsi_intc *ti, unsigned int hwirq);
 void tsi_intc_irq_unmask_hw(struct tsi_intc *ti, unsigned int hwirq);
 void tsi_intc_irq_ack_hw(struct tsi_intc *ti, unsigned int hwirq);
