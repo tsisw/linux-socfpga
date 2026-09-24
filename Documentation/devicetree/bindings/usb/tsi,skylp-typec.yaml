@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/tsi,skylp-typec.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TSI SkyLP Type-C plug/orientation glue
+
+maintainers:
+  - Mahesh Babu <maheshbabu@tsavoritesi.com>
+
+description: |
+  Glue between a board's autonomous USB PD controller and the TSI SkyLP
+  Type-C lane mux. On the Helix-M board a TI TPS25730D resolves plug
+  state and cable orientation on its own and reports them on two GPIO
+  lines (USB_PLUG_EVENT, USB_PLUG_FLIP) wired to SkyLP GPIO pads; this
+  node follows those lines and keeps the lane mux's flip bit in sync.
+  The lines are polled, since the SkyLP GPIO interrupt path is
+  level-only and the pad routing is not yet confirmed.
+
+  Both GPIOs are optional. Without them the node programs a fixed
+  orientation once at probe. The mux word sits inside the DP/PHY APB
+  window the tsi,skylp-dp node claims, so it is mapped without claiming
+  a region.
+
+properties:
+  compatible:
+    const: tsi,skylp-typec
+
+  reg:
+    maxItems: 1
+    description: The Type-C lane-mux word.
+
+  plug-event-gpios:
+    maxItems: 1
+    description: PD controller's plug-detect line (TPS25730D
+      USB_PLUG_EVENT). Polarity comes from the GPIO flags.
+
+  plug-flip-gpios:
+    maxItems: 1
+    description: PD controller's cable-orientation line (TPS25730D
+      USB_PLUG_FLIP). Polarity comes from the GPIO flags.
+
+  tsi,mux-mode:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [0, 1, 2, 3]
+    default: 1
+    description:
+      Type-C lane-mux mode to hold while updating the flip bit. 1 =
+      USB3.2 Gen2x2, 2 = USB3.2 + 2-lane DisplayPort, 3 = 4-lane
+      DisplayPort.
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    typec@24021714 {
+        compatible = "tsi,skylp-typec";
+        reg = <0x24021714 0x4>;
+        plug-event-gpios = <&ionw_pinctrl 4 GPIO_ACTIVE_HIGH>;
+        plug-flip-gpios = <&ionw_pinctrl 5 GPIO_ACTIVE_HIGH>;
+        tsi,mux-mode = <1>;
+    };

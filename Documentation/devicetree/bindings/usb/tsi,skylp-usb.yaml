@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/tsi,skylp-usb.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TSI SkyLP USB3.2 DRD controller (SOC USB3 DRD core)
+
+maintainers:
+  - Mahesh Babu <maheshbabu@tsavoritesi.com>
+
+description: |
+  The USB3.2 dual-role controller of the TSI SkyLP chiplet's UDI
+  subsystem: the Innosilicon-integrated SOC USB3 DRD core (a
+  DWC3-register-compatible IP whose ID registers are not populated, so
+  it binds to the soc_drd driver, not to snps,dwc3).
+
+  On top of the plain "soc,soc_drd3" controller node this binding adds
+  the SkyLP platform init the vendor driver leaves empty: the TSAR
+  block-control release, the UDI reference-clock select, and the
+  mandatory Type-C lane-mux write. The mux word resets to "no
+  connection", so a node without the tsi-mux window can never train a
+  link.
+
+  The TSAR and clock-select VALUES are intentionally DT-supplied
+  (tsi,tsar-init / tsi,clksel-init): their bit assignments are still
+  being confirmed with the hardware team, and a step is skipped when
+  its property is absent. The mux write always happens.
+
+  All windows are standalone MMIO ranges and must be left out of any
+  tsi,skylp-chiplet node's "reg". The tsar/clksel words are mapped
+  without claiming a region since they sit inside CSR space the chiplet
+  core may own; the mux word sits inside the DP/PHY APB window the
+  tsi,skylp-dp node claims.
+
+properties:
+  compatible:
+    items:
+      - const: tsi,skylp-usb
+      - const: soc,soc_drd3
+
+  reg:
+    minItems: 2
+    items:
+      - description: Controller registers (xHCI window followed by the
+          global registers at +0xc100)
+      - description: Type-C lane-mux word
+      - description: TSAR block-control word
+      - description: UDI reference-clock-select word
+
+  reg-names:
+    minItems: 2
+    items:
+      - const: usb
+      - const: tsi-mux
+      - const: tsi-tsar
+      - const: tsi-clksel
+
+  interrupts:
+    maxItems: 1
+
+  tsi,tsar-init:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Value written to the TSAR block-control word first in the init
+      sequence, followed by a >= 100 us settle. Requires the tsi-tsar
+      window.
+
+  tsi,clksel-init:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Value written to the UDI reference-clock-select word before the
+      mux write. Requires the tsi-clksel window.
+
+  tsi,mux-mode:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [0, 1, 2, 3]
+    default: 1
+    description:
+      Type-C lane-mux mode. 0 = no connection (reset value), 1 = USB3.2
+      Gen2x2, 2 = USB3.2 + 2-lane DisplayPort, 3 = 4-lane DisplayPort.
+
+  tsi,mux-flip:
+    type: boolean
+    description:
+      Boot-time cable orientation. Runtime orientation tracking is the
+      tsi,skylp-typec node's job.
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+    usb@24000150 {
+        compatible = "tsi,skylp-usb", "soc,soc_drd3";
+        reg = <0x24000150 0x10000>,
+              <0x24021714 0x4>,
+              <0x24000008 0x4>,
+              <0x2400014c 0x4>;
+        reg-names = "usb", "tsi-mux", "tsi-tsar", "tsi-clksel";
+        /* usb_intr, line 0 of the UDI collector */
+        interrupts-extended = <&udi_intc 0 4>;
+        tsi,mux-mode = <1>;
+    };
