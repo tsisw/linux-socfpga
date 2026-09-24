@@ -59,9 +59,20 @@ struct tsi_skylp_init {
 	bool	mux_flip;
 };
 
+/* Last-written mux value, so runtime updates skip redundant writes. */
+struct tsi_skylp_mux_cache {
+	u32	val;
+	bool	valid;
+};
+
+#define TSI_SKYLP_MUX_CACHE_INIT	{ }
+
 u32 tsi_skylp_mux_val(u32 mode, bool flip);
 int tsi_skylp_usb_init_seq(const struct tsi_skylp_hw *hw,
 			   const struct tsi_skylp_init *init);
+bool tsi_skylp_mux_update(struct tsi_skylp_mux_cache *cache,
+			  const struct tsi_skylp_hw *hw,
+			  u32 mode, bool flip);
 
 struct device;
 

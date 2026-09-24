@@ -173,6 +173,34 @@ static void skylp_test_seq_rejects_bad_mode(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, log.nops, 0);
 }
 
+/* first update always writes; repeating the same state writes nothing;
+ * a flip change writes exactly the new value (glue interrupt path)
+ */
+static void skylp_test_mux_update_writes_only_on_change(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+	struct tsi_skylp_mux_cache cache = TSI_SKYLP_MUX_CACHE_INIT;
+
+	KUNIT_EXPECT_TRUE(test, tsi_skylp_mux_update(&cache, &hw,
+						     TSI_SKYLP_MUX_MODE_USB,
+						     false));
+	KUNIT_ASSERT_EQ(test, log.nops, 1);
+	KUNIT_EXPECT_EQ(test, log.ops[0].reg, TSI_SKYLP_REG_MUX);
+	KUNIT_EXPECT_EQ(test, log.ops[0].val, 0x7000u);
+
+	KUNIT_EXPECT_FALSE(test, tsi_skylp_mux_update(&cache, &hw,
+						      TSI_SKYLP_MUX_MODE_USB,
+						      false));
+	KUNIT_EXPECT_EQ(test, log.nops, 1);
+
+	KUNIT_EXPECT_TRUE(test, tsi_skylp_mux_update(&cache, &hw,
+						     TSI_SKYLP_MUX_MODE_USB,
+						     true));
+	KUNIT_ASSERT_EQ(test, log.nops, 2);
+	KUNIT_EXPECT_EQ(test, log.ops[1].val, 0x17000u);
+}
+
 static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_mux_val_usb),
 	KUNIT_CASE(skylp_test_mux_val_usb_flipped),
@@ -181,6 +209,7 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_seq_mux_only),
 	KUNIT_CASE(skylp_test_seq_tsar_only_keeps_settle),
 	KUNIT_CASE(skylp_test_seq_rejects_bad_mode),
+	KUNIT_CASE(skylp_test_mux_update_writes_only_on_change),
 	{}
 };
 

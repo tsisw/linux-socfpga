@@ -53,6 +53,27 @@ int tsi_skylp_usb_init_seq(const struct tsi_skylp_hw *hw,
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_init_seq);
 
+/*
+ * Runtime mux update (plug/flip interrupt path): write only when the
+ * value actually changes, so servicing an event never glitches the
+ * lane mux under an established link. Returns true when written.
+ */
+bool tsi_skylp_mux_update(struct tsi_skylp_mux_cache *cache,
+			  const struct tsi_skylp_hw *hw,
+			  u32 mode, bool flip)
+{
+	u32 val = tsi_skylp_mux_val(mode, flip);
+
+	if (cache->valid && cache->val == val)
+		return false;
+
+	hw->wr(hw->ctx, TSI_SKYLP_REG_MUX, val);
+	cache->val = val;
+	cache->valid = true;
+	return true;
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_mux_update);
+
 /* Binder: DT + MMIO plumbing over the tested sequence core. */
 
 struct tsi_skylp_iomem {

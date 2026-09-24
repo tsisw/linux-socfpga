@@ -60,6 +60,17 @@ config USB_SOC_DRD_SKYLP
 	  The sequence core has no USB dependencies so it can also be
 	  KUnit-tested and reused by the Type-C glue driver.
 
+config USB_SOC_DRD_SKYLP_TYPEC
+	tristate "TSI SkyLP Type-C plug/orientation glue"
+	depends on USB_SOC_DRD_SKYLP
+	depends on GPIOLIB
+	default USB_SOC_DRD
+	help
+	  Follows the PD controller's plug/orientation GPIO lines (TI
+	  TPS25730D on the Helix-M board) and keeps the SkyLP Type-C
+	  lane mux's flip bit in sync. Without it the mux keeps the
+	  boot-time orientation and a flipped cable trains no link.
+
 config USB_SOC_DRD_SKYLP_KUNIT_TEST
 	tristate "KUnit tests for the TSI SkyLP init-sequence core" if !KUNIT_ALL_TESTS
 	depends on USB_SOC_DRD_SKYLP && KUNIT
