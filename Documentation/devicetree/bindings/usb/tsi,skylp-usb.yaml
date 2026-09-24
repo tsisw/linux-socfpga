@@ -59,6 +59,20 @@ properties:
   interrupts:
     maxItems: 1
 
+  clocks:
+    description:
+      Clocks feeding the UDI USB subsystem. The soc_drd controller
+      driver itself consumes no clocks, so the SkyLP integration
+      enables every clock listed here before running the init sequence
+      and holds them for the device's lifetime. Optional until the UDI
+      clock topology is confirmed.
+    minItems: 1
+    maxItems: 4
+
+  clock-names:
+    minItems: 1
+    maxItems: 4
+
   tsi,tsar-init:
     $ref: /schemas/types.yaml#/definitions/uint32
     description:
@@ -86,6 +100,51 @@ properties:
       Boot-time cable orientation. Runtime orientation tracking is the
       tsi,skylp-typec node's job.
 
+  dr_mode:
+    enum: [host, peripheral, otg]
+    description:
+      Fixed role. The controller ships no role-switching layer, so this
+      is the role for the lifetime of the device.
+
+  maximum-speed:
+    $ref: /schemas/types.yaml#/definitions/string
+    enum: [super-speed-plus, super-speed, high-speed, full-speed]
+
+  phy_type:
+    $ref: /schemas/types.yaml#/definitions/string
+    enum: [utmi, utmi_wide]
+    description:
+      Width of the controller's USB 2.0 UTMI interface. Note the USB2
+      PHY is off-macro on SkyLP, so this only sizes the controller-side
+      interface.
+
+  usb-psy-name:
+    $ref: /schemas/types.yaml#/definitions/string
+    description:
+      Name of a power supply the gadget path reports its current draw
+      to. Optional; absent means no reporting.
+
+  dma-coherent: true
+
+  iommus:
+    maxItems: 1
+
+  resets:
+    maxItems: 1
+
+  power-domains:
+    maxItems: 1
+
+patternProperties:
+  # The vendor controller carries a large set of errata and threshold
+  # knobs in its own namespace. They belong to the soc,soc_drd3
+  # fallback, which has no binding of its own, so accept the namespace
+  # rather than duplicating three dozen entries here.
+  "^soc,[a-z0-9-_]+$":
+    description:
+      Vendor soc_drd quirk, erratum or threshold property. See the
+      driver for the accepted set.
+
 required:
   - compatible
   - reg
@@ -105,5 +164,10 @@ examples:
         reg-names = "usb", "tsi-mux", "tsi-tsar", "tsi-clksel";
         /* usb_intr, line 0 of the UDI collector */
         interrupts-extended = <&udi_intc 0 4>;
+        dr_mode = "host";
+        maximum-speed = "super-speed-plus";
+        phy_type = "utmi_wide";
+        soc,dis_u3_susphy_quirk;
+        soc,dis_u2_susphy_quirk;
         tsi,mux-mode = <1>;
     };
