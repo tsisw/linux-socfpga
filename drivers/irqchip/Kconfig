@@ -741,4 +741,25 @@ config SUNPLUS_SP7021_INTC
 	  chained controller, routing all interrupt source in P-Chip to
 	  the primary controller on C-Chip.
 
+config TSI_SKYLP_INTC
+	tristate "TSI SkyLP interrupt-collector irqchip"
+	depends on OF
+	depends on TSI_CHIPLET || COMPILE_TEST
+	select IRQ_DOMAIN
+	select REGMAP_MMIO
+	help
+	  Chained irqchip for the TSI SkyLP interrupt collectors that carry
+	  non-GPIO sources, first the GPP/UDI instance (USB, DisplayPort,
+	  video bridge, audio). One instance owns one destination group of
+	  one collector. Probes dormant when the collector-to-GIC routing
+	  is not yet described in the devicetree.
+
+config TSI_SKYLP_INTC_KUNIT_TEST
+	tristate "KUnit tests for the TSI SkyLP irqchip" if !KUNIT_ALL_TESTS
+	depends on TSI_SKYLP_INTC && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Register-discipline tests for the collector irqchip, driven
+	  against a fake regmap.
+
 endmenu
