@@ -1,0 +1,75 @@
+TSI SkyLP: ACPI description of the UDI subsystem
+=================================================
+
+skylp-udi.asl   SSDT for one SkyLP chiplet's UDI block: the udi_intr
+                collector, the USB 3.2 DRD controller with the SkyLP init
+                hooks, the Type-C lane-mux glue, the DP PHY, the DP TX
+                controller and video bridge 0 (the DRM CRTC), including the
+                _DSD graph link between bridge and DP controller.
+enum-init.c     Static /init for a boot check: lists the platform devices
+                the SSDT produced and powers off.
+
+How the drivers find their description
+--------------------------------------
+Every device carries _HID "PRP0001" (or a TSI _HID with _CID "PRP0001") and
+a _DSD "compatible" string identical to the devicetree binding. The kernel
+matches the drivers' of_match_table through that string and serves the
+_DSD properties through the same device_property_*() calls the drivers
+already use, so devicetree and ACPI boards run the same driver code.
+
+Three things have no ACPI equivalent of the DT phandle and are handled
+explicitly:
+  - interrupts from the UDI collector: an Extended Interrupt descriptor
+    whose ResourceSource is the collector device; the number is the
+    udi_intr bit. The collector's irq domain is keyed on its ACPI node.
+  - the PHY and pixel clocks of the DP controller: the PHY's _DSD names
+    the consumer device ("tsi,consumer") and the PHY driver registers
+    phy/clk lookups under that name. The DP driver defers until they exist.
+  - the CRTC-to-encoder link: the _DSD graph (port@0/endpoint@0 on both
+    sides) is walked with fwnode_graph_*; the master fills in the
+    encoder's possible_crtcs, which the vendor driver can only derive from
+    an OF graph.
+
+USB _CRS ordering (ACPI resources have no names): 0 controller, 1 lane
+mux, 2 tsar_control, 3 udi_clk_sel.
+
+Build and check
+---------------
+  iasl -oa -p skylp-udi skylp-udi.asl         -> skylp-udi.aml
+
+Injecting the table before the BIOS carries it
+----------------------------------------------
+With CONFIG_ACPI_TABLE_UPGRADE the kernel takes SSDTs from an uncompressed
+cpio at the start of the initrd:
+
+  mkdir -p tbl/kernel/firmware/acpi
+  cp skylp-udi.aml tbl/kernel/firmware/acpi/
+  (cd tbl && find kernel | cpio -o -H newc) > tables.cpio
+  cat tables.cpio initrd.img > initrd-with-tables.img
+
+Boot with that initrd (and acpi=force on arm64 if a devicetree is also
+present). "ACPI: table upgrade" lines in dmesg confirm the load.
+
+QEMU enumeration check (no SkyLP hardware; drivers must not be built in,
+since the register windows do not exist on the virt machine):
+
+  aarch64-linux-gnu-gcc -static -Os -o init enum-init.c
+  mkdir -p rootfs/sys rootfs/proc && cp init rootfs/init
+  (cd rootfs && find . | cpio -o -H newc | gzip -9) > initrd.gz
+  cat tables.cpio initrd.gz > initrd-with-tables.img
+  qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1G -nographic \
+    -drive if=pflash,format=raw,file=AAVMF_CODE.fd,readonly=on \
+    -drive if=pflash,format=raw,file=AAVMF_VARS.fd \
+    -kernel Image -initrd initrd-with-tables.img \
+    -append "console=ttyAMA0 acpi=force"
+
+Expected: one ENUM line per device with modalias
+"acpi:PRP0001:" / "acpi:TSI0000x:PRP0001:" and the _DSD compatible in the
+of: alias, and the ACPI path under \_SB.LP0.
+
+Open items encoded as comments in the ASL
+-----------------------------------------
+  - tsi,tsar-init / tsi,clksel-init values (HW-8, HW-4 bit maps)
+  - plug-event / plug-flip GPIOs need the SkyLP GPIO controller in ACPI
+  - LP1 (the chiplet behind the J43 DP receptacle on Helix-M) needs its
+    own copy of the block with its base addresses and rollup (HW-35)
