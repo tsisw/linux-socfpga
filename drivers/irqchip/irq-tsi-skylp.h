@@ -61,6 +61,12 @@ void tsi_intc_irq_unmask_hw(struct tsi_intc *ti, unsigned int hwirq);
 void tsi_intc_irq_ack_hw(struct tsi_intc *ti, unsigned int hwirq);
 int tsi_intc_irq_type_valid(unsigned int type);
 /*
+ * Read tsi,dest-group (default 0) and tsi,num-sources (default all 32) from
+ * any firmware node - DT, ACPI _DSD or software node - and range-check them.
+ */
+int tsi_intc_parse(const struct fwnode_handle *fw, u32 *dest_grp,
+		   u32 *nr_sources);
+/*
  * Drain this group's pending sources: invoke fire(hwirq, cookie) for each
  * set bit in ip_status_g, low to high. The drain does not ack. The latch
  * is sticky and level-transparent (HW-2), so it may only be cleared once

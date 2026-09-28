@@ -25,6 +25,7 @@
 #include <kunit/test.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 
 #include "irq-tsi-skylp.h"
@@ -229,7 +230,50 @@ static void tsi_intc_test_drain_idle_is_silent(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, fx->f->nwrites, 0);
 }
 
+/* the collector node as the SkyLP SSDT describes it */
+static const struct property_entry fw_intc_props[] = {
+	PROPERTY_ENTRY_STRING("compatible", "tsi,skylp-intc"),
+	PROPERTY_ENTRY_U32("tsi,dest-group", 2),
+	PROPERTY_ENTRY_U32("tsi,num-sources", 8),
+	{ }
+};
+
+static const struct property_entry fw_intc_bad_props[] = {
+	PROPERTY_ENTRY_U32("tsi,dest-group", 4),
+	{ }
+};
+
+static const struct property_entry fw_intc_bare_props[] = { { } };
+
+static void tsi_intc_test_parse_fwnode(struct kunit *test)
+{
+	struct fwnode_handle *fw;
+	u32 grp = 99, n = 99;
+
+	fw = fwnode_create_software_node(fw_intc_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	KUNIT_EXPECT_EQ(test, tsi_intc_parse(fw, &grp, &n), 0);
+	KUNIT_EXPECT_EQ(test, grp, 2u);
+	KUNIT_EXPECT_EQ(test, n, 8u);
+	fwnode_remove_software_node(fw);
+
+	/* defaults: group 0, every source */
+	fw = fwnode_create_software_node(fw_intc_bare_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	KUNIT_EXPECT_EQ(test, tsi_intc_parse(fw, &grp, &n), 0);
+	KUNIT_EXPECT_EQ(test, grp, 0u);
+	KUNIT_EXPECT_EQ(test, n, (u32)TSI_INTC_MAX_SOURCES);
+	fwnode_remove_software_node(fw);
+
+	/* only four destination groups exist */
+	fw = fwnode_create_software_node(fw_intc_bad_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	KUNIT_EXPECT_EQ(test, tsi_intc_parse(fw, &grp, &n), -EINVAL);
+	fwnode_remove_software_node(fw);
+}
+
 static struct kunit_case tsi_intc_test_cases[] = {
+	KUNIT_CASE(tsi_intc_test_parse_fwnode),
 	KUNIT_CASE(tsi_intc_test_unmask_arms_global_and_group),
 	KUNIT_CASE(tsi_intc_test_mask_clears_group_only),
 	KUNIT_CASE(tsi_intc_test_ack_is_single_w1c_write),

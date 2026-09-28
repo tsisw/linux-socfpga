@@ -33,6 +33,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 
 #include "irq-tsi-skylp.h"
@@ -87,6 +88,22 @@ VISIBLE_IF_KUNIT int tsi_intc_irq_type_valid(unsigned int type)
 	}
 }
 EXPORT_SYMBOL_IF_KUNIT(tsi_intc_irq_type_valid);
+
+VISIBLE_IF_KUNIT int tsi_intc_parse(const struct fwnode_handle *fw,
+				    u32 *dest_grp, u32 *nr_sources)
+{
+	if (fwnode_property_read_u32(fw, "tsi,dest-group", dest_grp))
+		*dest_grp = 0;
+	if (*dest_grp >= TSI_INTC_NR_GROUPS)
+		return -EINVAL;
+
+	if (fwnode_property_read_u32(fw, "tsi,num-sources", nr_sources))
+		*nr_sources = TSI_INTC_MAX_SOURCES;
+	if (!*nr_sources || *nr_sources > TSI_INTC_MAX_SOURCES)
+		return -EINVAL;
+	return 0;
+}
+EXPORT_SYMBOL_IF_KUNIT(tsi_intc_parse);
 
 VISIBLE_IF_KUNIT int tsi_intc_drain(struct tsi_intc *ti,
 				    void (*fire)(unsigned int hwirq,
@@ -178,8 +195,9 @@ static int tsi_intc_domain_map(struct irq_domain *d, unsigned int irq,
 }
 
 static const struct irq_domain_ops tsi_intc_domain_ops = {
-	.map	= tsi_intc_domain_map,
-	.xlate	= irq_domain_xlate_twocell,
+	.map		= tsi_intc_domain_map,
+	/* two cells from DT, or hwirq + flags from an ACPI ResourceSource */
+	.translate	= irq_domain_translate_twocell,
 };
 
 static void tsi_intc_fire(unsigned int hwirq, void *cookie)
@@ -226,28 +244,24 @@ static int tsi_intc_probe(struct platform_device *pdev)
 		return PTR_ERR(ti->regmap);
 	ti->base = 0;	/* reg points at the collector origin */
 
-	if (of_property_read_u32(dev->of_node, "tsi,dest-group",
-				 &ti->dest_grp))
-		ti->dest_grp = 0;
-	if (ti->dest_grp >= TSI_INTC_NR_GROUPS)
-		return dev_err_probe(dev, -EINVAL, "bad tsi,dest-group %u\n",
-				     ti->dest_grp);
+	if (tsi_intc_parse(dev_fwnode(dev), &ti->dest_grp, &ti->nr_sources))
+		return dev_err_probe(dev, -EINVAL,
+				     "bad tsi,dest-group / tsi,num-sources\n");
 
-	if (of_property_read_u32(dev->of_node, "tsi,num-sources",
-				 &ti->nr_sources))
-		ti->nr_sources = TSI_INTC_MAX_SOURCES;
-	if (!ti->nr_sources || ti->nr_sources > TSI_INTC_MAX_SOURCES)
-		return dev_err_probe(dev, -EINVAL, "bad tsi,num-sources %u\n",
-				     ti->nr_sources);
-
-	ti->domain = irq_domain_add_linear(dev->of_node, ti->nr_sources,
-					   &tsi_intc_domain_ops, ti);
+	/*
+	 * The domain is keyed on the device's firmware node, so an ACPI child
+	 * naming this device as its Interrupt ResourceSource resolves here
+	 * (and defers until this probe has run), exactly as a DT child does
+	 * through interrupt-parent.
+	 */
+	ti->domain = irq_domain_create_linear(dev_fwnode(dev), ti->nr_sources,
+					      &tsi_intc_domain_ops, ti);
 	if (!ti->domain)
 		return -ENOMEM;
 
 	/*
 	 * Collector-group -> GIC routing is gap G3: without an answer the
-	 * DT carries no interrupts property and the instance stays
+	 * firmware carries no parent interrupt and the instance stays
 	 * dormant (domain up, nothing dispatches).
 	 */
 	irq = platform_get_irq_optional(pdev, 0);
