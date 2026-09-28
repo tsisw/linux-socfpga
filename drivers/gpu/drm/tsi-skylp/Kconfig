@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config DRM_TSI_SKYLP_VB
+	tristate "TSI SkyLP video bridge register core" if KUNIT
+	depends on DRM
+	help
+	  Register encoding and programming sequences for the SkyLP video
+	  bridge: mode-to-timing conversion, framebuffer address and format
+	  programming, channel start and stop, and interrupt acknowledge.
+	  They are kept free of DRM object state so they can be unit tested
+	  on their own. The prompt only appears in KUnit builds.
+
+config DRM_TSI_SKYLP_KUNIT_TEST
+	tristate "KUnit tests for the TSI SkyLP video bridge core" if !KUNIT_ALL_TESTS
+	depends on DRM_TSI_SKYLP_VB && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Unit tests for the video bridge programming core. They cover mode
+	  to timing conversion and its field limits, the accepted pixel
+	  formats, the 40-bit and 4 GiB scanout address rules, page-flip
+	  slot alternation and write order, and the interrupt acknowledge
+	  sequence. They run against a fake register file.
+
+	  If unsure, say N.

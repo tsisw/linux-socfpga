@@ -476,6 +476,8 @@ source "drivers/gpu/drm/xlnx/Kconfig"
 
 source "drivers/gpu/drm/tsi-dp/Kconfig"
 
+source "drivers/gpu/drm/tsi-skylp/Kconfig"
+
 source "drivers/gpu/drm/gud/Kconfig"
 
 source "drivers/gpu/drm/solomon/Kconfig"
