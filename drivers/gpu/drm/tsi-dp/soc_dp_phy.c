@@ -1,4 +1,6 @@
 #include <linux/module.h>
+#include <linux/property.h>
+#include <linux/clkdev.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/of.h>
@@ -1057,7 +1059,7 @@ static int soc_dp_phy_probe(struct platform_device *pdev)
 	if (!priv->regs)
 		return -ENOMEM;
 
-	if (of_property_read_u32(pdev->dev.of_node, "ref_clock", &priv->ref_clk_khz)) {
+	if (device_property_read_u32(dev, "ref_clock", &priv->ref_clk_khz)) {
 		dev_err(dev, "ref_clock attribute not found, default to use 24M\n");
 		priv->ref_clk_khz = 24000;
 	}
@@ -1102,6 +1104,31 @@ static int soc_dp_phy_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dev, "Failed to add clock provider: %d\n", ret);
 		return ret;
+	}
+
+	/*
+	 * TSI: without a devicetree there are no phy/clock phandles. ACPI names
+	 * the consumer (_DSD "tsi,consumer", the DP controller's device name) so
+	 * phy_get("phy") and clk_get("pixel-N") resolve through lookups instead.
+	 */
+	if (!dev->of_node) {
+		const char *consumer;
+
+		if (device_property_read_string(dev, "tsi,consumer", &consumer))
+			return dev_err_probe(dev, -EINVAL,
+					     "no tsi,consumer for the ACPI phy/clk lookups\n");
+		ret = phy_create_lookup(phy, "phy", consumer);
+		if (ret)
+			return ret;
+		for (i = 0; i < SOC_DP_PHY_MAX_STREAMS; i++) {
+			char con_id[16];
+
+			snprintf(con_id, sizeof(con_id), "pixel-%d", i);
+			ret = devm_clk_hw_register_clkdev(dev, &priv->pixel_clks[i].hw,
+							  con_id, consumer);
+			if (ret)
+				return ret;
+		}
 	}
 
 	return 0;

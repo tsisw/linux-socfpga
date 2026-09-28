@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/component.h>
@@ -1763,7 +1764,7 @@ static int soc_dp_probe(struct platform_device *pdev)
 	dp->proc_irq = NULL;
 	dp->max_mst_streams = 1;
 	dp->connector_status = connector_status_connected;
-	dp->only_sst = of_property_read_bool(dev->of_node, "only-sst");
+	dp->only_sst = device_property_read_bool(dev, "only-sst");
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -1789,16 +1790,25 @@ static int soc_dp_probe(struct platform_device *pdev)
 	}
 #endif
 
+	/*
+	 * TSI: under ACPI the PHY and pixel clocks come from lookups the PHY
+	 * driver registers in its probe; "not found" then means "not yet".
+	 */
 	dp->phy = devm_phy_get(dev, "phy");
 	if (IS_ERR(dp->phy)) {
+		if (!dev->of_node && PTR_ERR(dp->phy) == -ENODEV)
+			return -EPROBE_DEFER;
 		dev_err(dev, "Failed to get PHY\n");
 		return PTR_ERR(dp->phy);
 	}
 
 	dp->pixel_clks[0] = devm_clk_get(dev, "pixel-0");
-	if (IS_ERR(dp->pixel_clks[0]))
+	if (IS_ERR(dp->pixel_clks[0])) {
+		if (!dev->of_node && PTR_ERR(dp->pixel_clks[0]) == -ENOENT)
+			return -EPROBE_DEFER;
 		return dev_err_probe(dev, PTR_ERR(dp->pixel_clks[0]),
 			"Failed to get pixel-0 clock\n");
+	}
 
 	platform_set_drvdata(pdev, dp);
 
