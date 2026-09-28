@@ -103,8 +103,8 @@ VISIBLE_IF_KUNIT int tsi_intc_drain(struct tsi_intc *ti,
 		return 0;
 	ip = val & GENMASK(ti->nr_sources - 1, 0);
 
+	/* no ack here: the flow's irq_eoi clears the latch after the child */
 	for_each_set_bit(hwirq, &ip, ti->nr_sources) {
-		tsi_intc_irq_ack_hw(ti, hwirq);
 		fire(hwirq, cookie);
 		n++;
 	}
@@ -125,10 +125,21 @@ static void tsi_intc_unmask(struct irq_data *d)
 			       irqd_to_hwirq(d));
 }
 
-static void tsi_intc_ack(struct irq_data *d)
+/*
+ * The latch is sticky and level-transparent (HW-2): clearing it while the
+ * child still asserts its source is undone at once, and clearing it before
+ * the child runs leaves it set after the child clears the source, which
+ * fires the line a second time for nothing. So the W1C is an EOI, issued
+ * by handle_fasteoi_irq after the handler, and after the thread for
+ * threaded handlers (IRQCHIP_EOI_THREADED).
+ */
+static void tsi_intc_eoi(struct irq_data *d)
 {
 	tsi_intc_irq_ack_hw(irq_data_get_irq_chip_data(d), irqd_to_hwirq(d));
 }
+
+VISIBLE_IF_KUNIT const irq_flow_handler_t tsi_intc_level_flow = handle_fasteoi_irq;
+EXPORT_SYMBOL_IF_KUNIT(tsi_intc_level_flow);
 
 static int tsi_intc_set_type(struct irq_data *d, unsigned int type)
 {
@@ -136,18 +147,19 @@ static int tsi_intc_set_type(struct irq_data *d, unsigned int type)
 
 	if (ret)
 		return ret;
-	irq_set_handler_locked(d, handle_level_irq);
+	irq_set_handler_locked(d, tsi_intc_level_flow);
 	return 0;
 }
 
-static const struct irq_chip tsi_intc_chip = {
+VISIBLE_IF_KUNIT const struct irq_chip tsi_intc_chip = {
 	.name		= "tsi-skylp-intc",
 	.irq_mask	= tsi_intc_mask,
 	.irq_unmask	= tsi_intc_unmask,
-	.irq_ack	= tsi_intc_ack,
+	.irq_eoi	= tsi_intc_eoi,
 	.irq_set_type	= tsi_intc_set_type,
-	.flags		= IRQCHIP_SKIP_SET_WAKE,
+	.flags		= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED,
 };
+EXPORT_SYMBOL_IF_KUNIT(tsi_intc_chip);
 
 static int tsi_intc_domain_map(struct irq_domain *d, unsigned int irq,
 			       irq_hw_number_t hwirq)

@@ -61,16 +61,18 @@ void tsi_intc_irq_unmask_hw(struct tsi_intc *ti, unsigned int hwirq);
 void tsi_intc_irq_ack_hw(struct tsi_intc *ti, unsigned int hwirq);
 int tsi_intc_irq_type_valid(unsigned int type);
 /*
- * Drain this group's pending sources: for each set bit in ip_status_g,
- * W1C-ack it and invoke fire(hwirq, cookie). Ack-before-fire is the
- * level-source discipline established for the corner collectors: the
- * latched bit is cleared first so a source still asserted after the
- * handler re-latches rather than being lost.
+ * Drain this group's pending sources: invoke fire(hwirq, cookie) for each
+ * set bit in ip_status_g, low to high. The drain does not ack. The latch
+ * is sticky and level-transparent (HW-2), so it may only be cleared once
+ * the child has cleared its own source; that W1C is the chip's irq_eoi,
+ * issued by the fasteoi flow after the child handler (or its thread) ran.
  * Returns the number of sources fired.
  */
 int tsi_intc_drain(struct tsi_intc *ti,
 		   void (*fire)(unsigned int hwirq, void *cookie),
 		   void *cookie);
+extern const struct irq_chip tsi_intc_chip;
+extern const irq_flow_handler_t tsi_intc_level_flow;
 #endif
 
 #endif /* __IRQ_TSI_SKYLP_H */

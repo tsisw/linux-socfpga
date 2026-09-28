@@ -12,7 +12,9 @@
  *  - mask disarms only this group's enable (never the shared global)
  *  - ack is a single W1C write of the source bit
  *  - only level trigger types are accepted
- *  - draining acks each pending source before firing it
+ *  - the ack is an EOI, after the child handler: the latch is sticky and
+ *    level-transparent (HW-2), so draining fires without acking and the
+ *    chip has no pre-handler irq_ack
  *
  * Driven against a fake regmap that records every write.
  *
@@ -22,6 +24,7 @@
 #include <kunit/device.h>
 #include <kunit/test.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/regmap.h>
 
 #include "irq-tsi-skylp.h"
@@ -176,16 +179,15 @@ static void drain_fire(unsigned int hwirq, void *cookie)
 {
 	struct drain_log *log = cookie;
 
-	/* the source's latched bit must already be acked when we fire */
-	KUNIT_EXPECT_EQ(log->test,
-			log->f->regs[UDI_W1C / 4] & BIT(hwirq), BIT(hwirq));
+	/* nothing may be acked before the child has run */
+	KUNIT_EXPECT_EQ(log->test, log->f->nwrites, 0);
 	if (log->nfired < 8)
 		log->fired[log->nfired] = hwirq;
 	log->nfired++;
 }
 
-/* drain fires each ip_status_g bit low-to-high, acking before firing */
-static void tsi_intc_test_drain_acks_then_fires_in_order(struct kunit *test)
+/* drain fires each ip_status_g bit low-to-high and writes nothing */
+static void tsi_intc_test_drain_fires_in_order_without_ack(struct kunit *test)
 {
 	struct intc_fixture *fx = intc_fixture(test, 0);
 	struct drain_log log = { .f = fx->f, .test = test };
@@ -199,6 +201,21 @@ static void tsi_intc_test_drain_acks_then_fires_in_order(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, log.nfired, 2);
 	KUNIT_EXPECT_EQ(test, log.fired[0], 0u);
 	KUNIT_EXPECT_EQ(test, log.fired[1], 1u);
+	KUNIT_EXPECT_EQ(test, fx->f->nwrites, 0);
+}
+
+/*
+ * The flow must ack after the handler: fasteoi with the W1C as irq_eoi,
+ * deferred past threaded handlers, and no irq_ack for a flow to call
+ * before the child has cleared its source.
+ */
+static void tsi_intc_test_ack_is_post_handler_eoi(struct kunit *test)
+{
+	KUNIT_EXPECT_PTR_EQ(test, (void *)tsi_intc_level_flow,
+			    (void *)handle_fasteoi_irq);
+	KUNIT_EXPECT_NULL(test, tsi_intc_chip.irq_ack);
+	KUNIT_EXPECT_NOT_NULL(test, tsi_intc_chip.irq_eoi);
+	KUNIT_EXPECT_TRUE(test, tsi_intc_chip.flags & IRQCHIP_EOI_THREADED);
 }
 
 /* nothing pending: no writes, no fires, returns 0 */
@@ -218,7 +235,8 @@ static struct kunit_case tsi_intc_test_cases[] = {
 	KUNIT_CASE(tsi_intc_test_ack_is_single_w1c_write),
 	KUNIT_CASE(tsi_intc_test_dest_group_selects_registers),
 	KUNIT_CASE(tsi_intc_test_rejects_edge_types),
-	KUNIT_CASE(tsi_intc_test_drain_acks_then_fires_in_order),
+	KUNIT_CASE(tsi_intc_test_drain_fires_in_order_without_ack),
+	KUNIT_CASE(tsi_intc_test_ack_is_post_handler_eoi),
 	KUNIT_CASE(tsi_intc_test_drain_idle_is_silent),
 	{}
 };
