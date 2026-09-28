@@ -19,6 +19,7 @@
  */
 
 #include <kunit/test.h>
+#include <linux/property.h>
 #include <linux/usb/typec_altmode.h>
 #include <linux/usb/typec_dp.h>
 
@@ -267,6 +268,74 @@ static void skylp_test_typec_unknown_mode_rejected(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, mode, 0xffu);
 }
 
+/* the USB node as the SkyLP SSDT describes it, plus the pending init words */
+static const char *const fw_usb_compat[] = { "tsi,skylp-usb", "soc,soc_drd3" };
+
+static const struct property_entry fw_usb_props[] = {
+	PROPERTY_ENTRY_STRING_ARRAY("compatible", fw_usb_compat),
+	PROPERTY_ENTRY_U32("tsi,mux-mode", TSI_SKYLP_MUX_MODE_USB_2DP),
+	PROPERTY_ENTRY_BOOL("tsi,mux-flip"),
+	PROPERTY_ENTRY_U32("tsi,tsar-init", 0x11),
+	{ }
+};
+
+static const struct property_entry fw_usb_minimal_props[] = {
+	PROPERTY_ENTRY_STRING("compatible", "tsi,skylp-usb"),
+	{ }
+};
+
+static const struct property_entry fw_usb_other_props[] = {
+	PROPERTY_ENTRY_STRING("compatible", "soc,soc_drd3"),
+	{ }
+};
+
+static const struct property_entry fw_usb_badmode_props[] = {
+	PROPERTY_ENTRY_STRING("compatible", "tsi,skylp-usb"),
+	PROPERTY_ENTRY_U32("tsi,mux-mode", 7),
+	{ }
+};
+
+static void skylp_test_usb_parse_fwnode(struct kunit *test)
+{
+	struct tsi_skylp_init init;
+	struct fwnode_handle *fw;
+
+	fw = fwnode_create_software_node(fw_usb_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	memset(&init, 0xa5, sizeof(init));
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_parse(fw, &init), 0);
+	KUNIT_EXPECT_TRUE(test, init.has_tsar);
+	KUNIT_EXPECT_EQ(test, init.tsar_val, 0x11u);
+	KUNIT_EXPECT_FALSE(test, init.has_clksel);
+	KUNIT_EXPECT_EQ(test, init.mux_mode, (u32)TSI_SKYLP_MUX_MODE_USB_2DP);
+	KUNIT_EXPECT_TRUE(test, init.mux_flip);
+	fwnode_remove_software_node(fw);
+
+	/* nothing but compatible: USB lanes, no flip, no init words */
+	fw = fwnode_create_software_node(fw_usb_minimal_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	memset(&init, 0xa5, sizeof(init));
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_parse(fw, &init), 0);
+	KUNIT_EXPECT_FALSE(test, init.has_tsar);
+	KUNIT_EXPECT_FALSE(test, init.has_clksel);
+	KUNIT_EXPECT_EQ(test, init.mux_mode, (u32)TSI_SKYLP_MUX_MODE_USB);
+	KUNIT_EXPECT_FALSE(test, init.mux_flip);
+	fwnode_remove_software_node(fw);
+
+	/* a plain vendor node is not ours */
+	fw = fwnode_create_software_node(fw_usb_other_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_parse(fw, &init), -ENODEV);
+	fwnode_remove_software_node(fw);
+
+	fw = fwnode_create_software_node(fw_usb_badmode_props, NULL);
+	KUNIT_ASSERT_FALSE(test, IS_ERR_OR_NULL(fw));
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_parse(fw, &init), -EINVAL);
+	fwnode_remove_software_node(fw);
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_parse(NULL, &init), -ENODEV);
+}
+
 static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_mux_val_usb),
 	KUNIT_CASE(skylp_test_mux_val_usb_flipped),
@@ -281,6 +350,7 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_typec_dp_four_lane),
 	KUNIT_CASE(skylp_test_typec_dp_two_lane_keeps_usb),
 	KUNIT_CASE(skylp_test_typec_unknown_mode_rejected),
+	KUNIT_CASE(skylp_test_usb_parse_fwnode),
 	{}
 };
 

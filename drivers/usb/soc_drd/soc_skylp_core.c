@@ -19,6 +19,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
+#include <linux/string.h>
 #include <linux/usb/typec_altmode.h>
 #include <linux/usb/typec_dp.h>
 
@@ -124,24 +126,48 @@ static void tsi_skylp_iomem_delay(void *ctx, unsigned int us)
  * clksel) sit inside the chiplet CSR window already claimed by the
  * tsi-chiplet core, and the mux word lives in the DP/PHY APB space.
  */
+/*
+ * DT names the extra windows (tsi-mux, tsi-tsar, tsi-clksel). ACPI _CRS
+ * entries carry no names, so there they are taken by position after the
+ * controller window: 1 = mux, 2 = tsar_control, 3 = udi_clk_sel, the order
+ * tools/tsi/acpi/skylp-udi.asl fixes.
+ */
 static void __iomem *tsi_skylp_map(struct platform_device *pdev,
-				   const char *name)
+				   const char *name, unsigned int index)
 {
 	struct resource *res;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
+	if (!res && !pdev->dev.of_node)
+		res = platform_get_resource(pdev, IORESOURCE_MEM, index);
 	if (!res)
 		return NULL;
 	return devm_ioremap(&pdev->dev, res->start, resource_size(res));
 }
 
+int tsi_skylp_usb_parse(const struct fwnode_handle *fw, struct tsi_skylp_init *init)
+{
+	if (!fw || !fwnode_device_is_compatible(fw, "tsi,skylp-usb"))
+		return -ENODEV;
+
+	memset(init, 0, sizeof(*init));
+	init->has_tsar = !fwnode_property_read_u32(fw, "tsi,tsar-init",
+						   &init->tsar_val);
+	init->has_clksel = !fwnode_property_read_u32(fw, "tsi,clksel-init",
+						     &init->clksel_val);
+	init->mux_mode = TSI_SKYLP_MUX_MODE_USB;
+	fwnode_property_read_u32(fw, "tsi,mux-mode", &init->mux_mode);
+	if (init->mux_mode > TSI_SKYLP_MUX_MODE_4DP)
+		return -EINVAL;
+	init->mux_flip = fwnode_property_read_bool(fw, "tsi,mux-flip");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_usb_parse);
+
 int tsi_skylp_usb_init(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct device_node *np = dev->of_node;
-	struct tsi_skylp_init init = {
-		.mux_mode = TSI_SKYLP_MUX_MODE_USB,
-	};
+	struct tsi_skylp_init init;
 	struct tsi_skylp_iomem *io;
 	struct tsi_skylp_hw hw = {
 		.wr = tsi_skylp_iomem_wr,
@@ -150,8 +176,11 @@ int tsi_skylp_usb_init(struct device *dev)
 	struct clk_bulk_data *clks;
 	int ret;
 
-	if (!np || !of_device_is_compatible(np, "tsi,skylp-usb"))
-		return 0;
+	ret = tsi_skylp_usb_parse(dev_fwnode(dev), &init);
+	if (ret == -ENODEV)
+		return 0;	/* not a SkyLP node: vendor defaults */
+	if (ret)
+		return dev_err_probe(dev, ret, "bad tsi,mux-mode\n");
 
 	/*
 	 * soc_drd itself consumes no clocks at all (gap G8) - unlike dwc3,
@@ -169,32 +198,25 @@ int tsi_skylp_usb_init(struct device *dev)
 		return -ENOMEM;
 	hw.ctx = io;
 
-	io->regs[TSI_SKYLP_REG_MUX] = tsi_skylp_map(pdev, "tsi-mux");
+	io->regs[TSI_SKYLP_REG_MUX] = tsi_skylp_map(pdev, "tsi-mux", 1);
 	if (!io->regs[TSI_SKYLP_REG_MUX])
 		return dev_err_probe(dev, -EINVAL,
 				     "missing tsi-mux window (mux resets to no-connection)\n");
 
-	init.has_tsar = !of_property_read_u32(np, "tsi,tsar-init",
-					      &init.tsar_val);
 	if (init.has_tsar) {
-		io->regs[TSI_SKYLP_REG_TSAR] = tsi_skylp_map(pdev, "tsi-tsar");
+		io->regs[TSI_SKYLP_REG_TSAR] = tsi_skylp_map(pdev, "tsi-tsar", 2);
 		if (!io->regs[TSI_SKYLP_REG_TSAR])
 			return dev_err_probe(dev, -EINVAL,
 					     "tsi,tsar-init without tsi-tsar window\n");
 	}
 
-	init.has_clksel = !of_property_read_u32(np, "tsi,clksel-init",
-						&init.clksel_val);
 	if (init.has_clksel) {
 		io->regs[TSI_SKYLP_REG_CLKSEL] = tsi_skylp_map(pdev,
-							       "tsi-clksel");
+							       "tsi-clksel", 3);
 		if (!io->regs[TSI_SKYLP_REG_CLKSEL])
 			return dev_err_probe(dev, -EINVAL,
 					     "tsi,clksel-init without tsi-clksel window\n");
 	}
-
-	of_property_read_u32(np, "tsi,mux-mode", &init.mux_mode);
-	init.mux_flip = of_property_read_bool(np, "tsi,mux-flip");
 
 	return tsi_skylp_usb_init_seq(&hw, &init);
 }

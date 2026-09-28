@@ -25,6 +25,7 @@
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 #include <linux/usb/typec_mux.h>
 #include <linux/workqueue.h>
 
@@ -213,7 +214,7 @@ static int skylp_typec_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	st->mode = TSI_SKYLP_MUX_MODE_USB;
-	of_property_read_u32(dev->of_node, "tsi,mux-mode", &st->mode);
+	device_property_read_u32(dev, "tsi,mux-mode", &st->mode);
 	if (st->mode > TSI_SKYLP_MUX_MODE_4DP)
 		return dev_err_probe(dev, -EINVAL, "bad tsi,mux-mode %u\n",
 				     st->mode);
