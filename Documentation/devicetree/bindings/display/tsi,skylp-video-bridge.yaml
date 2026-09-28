@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/tsi,skylp-video-bridge.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TSI SkyLP video bridge display controller
+
+maintainers:
+  - Mahesh Babu <maheshbabu@tsavoritesi.com>
+
+description: |
+  The Innosilicon UDI subsystem in TSI SkyLP carries two video bridges.
+  Each reads a physically contiguous framebuffer over AXI and streams it,
+  with timing, to the DisplayPort controller. A bridge holds four channels
+  and a block of registers shared by them; this node drives channel 0 of
+  one bridge as a single-stream CRTC.
+
+  The bridge addresses 40 bits and sits behind no IOMMU, so scanout buffers
+  must be contiguous. A memory-region can reserve them.
+
+  The single output port connects to an input port of the DP controller
+  node. The DP controller's driver resolves its possible CRTCs through
+  that link, so both ends must be described.
+
+properties:
+  compatible:
+    const: tsi,skylp-video-bridge
+
+  reg:
+    maxItems: 1
+    description:
+      The bridge register window, starting at channel 0 and covering the
+      shared block at +0x200. Bridge 0 is at subsystem APB +0x400.
+
+  interrupts:
+    maxItems: 1
+    description:
+      The bridge's frame-done line, normally from the UDI interrupt
+      collector. Optional; without it the display runs with no vblank and
+      page-flip events complete at commit time.
+
+  clocks:
+    minItems: 1
+    maxItems: 4
+    description:
+      Bus clocks the bridge needs enabled. The pixel clock is owned by the
+      DP controller and is not listed here.
+
+  memory-region:
+    maxItems: 1
+    description:
+      Reserved memory to allocate scanout buffers from. Without it they
+      come from the default CMA pool.
+
+  port:
+    $ref: /schemas/graph.yaml#/properties/port
+    unevaluatedProperties: false
+    description: Output to an input port of the DP controller.
+
+required:
+  - compatible
+  - reg
+  - port
+
+additionalProperties: false
+
+examples:
+  - |
+    display-controller@24010550 {
+        compatible = "tsi,skylp-video-bridge";
+        reg = <0x24010550 0x400>;
+        interrupt-parent = <&udi_intc>;
+        interrupts = <2 4>;
+
+        port {
+            vb0_out: endpoint {
+                remote-endpoint = <&dp_in0>;
+            };
+        };
+    };
+
+    dp@24050150 {
+        compatible = "soc,dp";
+        reg = <0x24050150 0x40000>;
+        phys = <&dp_phy>;
+        phy-names = "phy";
+        clocks = <&dp_phy 0>;
+        clock-names = "pixel-0";
+
+        ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            port@0 {
+                reg = <0>;
+                dp_in0: endpoint {
+                    remote-endpoint = <&vb0_out>;
+                };
+            };
+        };
+    };
+...
