@@ -2,7 +2,10 @@ menu "SOC DisplayPort (DP) Drivers"
 
 config DRM_SOC_DP
 	tristate "SOC DisplayPort Driver"
-	depends on DRM
+	depends on DRM && OF
+	select DRM_DISPLAY_DP_HELPER
+	select DRM_DISPLAY_HELPER
+	select DRM_KMS_HELPER
 	default n
 	help
 	  DRM/KMS driver for the SOC DisplayPort controller.
@@ -17,6 +20,7 @@ config DRM_SOC_DP
 
 config DRM_SOC_DP_PHY
 	tristate "SOC DisplayPort PHY Driver"
+	depends on OF && COMMON_CLK
 	select GENERIC_PHY
 	default n
 	help
