@@ -26,6 +26,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/property.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_modes.h>
 
@@ -305,6 +306,21 @@ u32 tsi_vb_irq_ack(const struct tsi_vb_hw *hw)
 	return status;
 }
 EXPORT_SYMBOL_GPL(tsi_vb_irq_ack);
+
+struct fwnode_handle *tsi_skylp_remote_encoder(const struct fwnode_handle *node)
+{
+	struct fwnode_handle *ep, *remote;
+
+	if (!node)
+		return NULL;
+	ep = fwnode_graph_get_endpoint_by_id(node, 0, 0, 0);
+	if (!ep)
+		return NULL;
+	remote = fwnode_graph_get_remote_port_parent(ep);
+	fwnode_handle_put(ep);
+	return remote;
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_remote_encoder);
 
 MODULE_DESCRIPTION("TSI SkyLP video bridge programming core");
 MODULE_LICENSE("GPL");

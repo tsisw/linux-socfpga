@@ -6,6 +6,7 @@
  */
 #include <kunit/test.h>
 #include <linux/bitfield.h>
+#include <linux/property.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_modes.h>
 
@@ -357,7 +358,82 @@ static void vb_irq_ack_idle_writes_nothing(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, f->nlog, 0u);
 }
 
+/*
+ * The firmware graph exactly as the SkyLP SSDT (tools/tsi/acpi/skylp-udi.asl)
+ * and the DT binding example describe it: bridge port@0/endpoint@0 whose
+ * remote-endpoint is the DP controller's port@0/endpoint@0.
+ */
+static const struct software_node fw_dp = { .name = "DP00" };
+
+static const struct property_entry fw_dp_port_props[] = {
+	PROPERTY_ENTRY_U32("port", 0),
+	{ }
+};
+
+static const struct software_node fw_dp_port = {
+	.name = "port@0", .parent = &fw_dp, .properties = fw_dp_port_props,
+};
+
+static const struct property_entry fw_dp_ep_props[] = {
+	PROPERTY_ENTRY_U32("reg", 0),
+	{ }
+};
+
+static const struct software_node fw_dp_ep = {
+	.name = "endpoint@0", .parent = &fw_dp_port, .properties = fw_dp_ep_props,
+};
+
+static const struct software_node fw_vb = { .name = "VBR0" };
+
+static const struct software_node fw_vb_port = {
+	.name = "port@0", .parent = &fw_vb, .properties = fw_dp_port_props,
+};
+
+static const struct property_entry fw_vb_ep_props[] = {
+	PROPERTY_ENTRY_U32("reg", 0),
+	PROPERTY_ENTRY_REF("remote-endpoint", &fw_dp_ep),
+	{ }
+};
+
+static const struct software_node fw_vb_ep = {
+	.name = "endpoint@0", .parent = &fw_vb_port, .properties = fw_vb_ep_props,
+};
+
+/* a bridge whose port has no endpoint: nothing to bind to */
+static const struct software_node fw_vb_lonely = { .name = "VBR1" };
+
+static const struct software_node fw_vb_lonely_port = {
+	.name = "port@0", .parent = &fw_vb_lonely, .properties = fw_dp_port_props,
+};
+
+static const struct software_node *fw_nodes[] = {
+	&fw_dp, &fw_dp_port, &fw_dp_ep, &fw_vb, &fw_vb_port, &fw_vb_ep,
+	&fw_vb_lonely, &fw_vb_lonely_port, NULL,
+};
+
+static void fw_nodes_unregister(void *unused)
+{
+	software_node_unregister_node_group(fw_nodes);
+}
+
+static void vb_fw_remote_encoder_follows_graph(struct kunit *test)
+{
+	struct fwnode_handle *remote;
+
+	KUNIT_ASSERT_EQ(test, software_node_register_node_group(fw_nodes), 0);
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, fw_nodes_unregister, NULL), 0);
+
+	remote = tsi_skylp_remote_encoder(software_node_fwnode(&fw_vb));
+	KUNIT_ASSERT_NOT_NULL(test, remote);
+	KUNIT_EXPECT_PTR_EQ(test, remote, software_node_fwnode(&fw_dp));
+	fwnode_handle_put(remote);
+
+	KUNIT_EXPECT_NULL(test, tsi_skylp_remote_encoder(software_node_fwnode(&fw_vb_lonely)));
+	KUNIT_EXPECT_NULL(test, tsi_skylp_remote_encoder(NULL));
+}
+
 static struct kunit_case tsi_vb_cases[] = {
+	KUNIT_CASE(vb_fw_remote_encoder_follows_graph),
 	KUNIT_CASE(vb_timing_720p_matches_reset_values),
 	KUNIT_CASE(vb_timing_negative_sync),
 	KUNIT_CASE(vb_timing_rejects_interlace),

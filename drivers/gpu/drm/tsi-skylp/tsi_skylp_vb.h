@@ -25,6 +25,7 @@
 #include <linux/types.h>
 
 struct drm_display_mode;
+struct fwnode_handle;
 
 #define TSI_VB_NUM_CHANNELS		4
 #define TSI_VB_CH_STRIDE		0x80
@@ -130,5 +131,12 @@ void tsi_vb_start(const struct tsi_vb_hw *hw, struct tsi_vb_state *st);
 void tsi_vb_stop(const struct tsi_vb_hw *hw, struct tsi_vb_state *st);
 void tsi_vb_frame_done_irq(const struct tsi_vb_hw *hw, bool enable);
 u32 tsi_vb_irq_ack(const struct tsi_vb_hw *hw);
+
+/*
+ * Firmware description: the encoder this bridge feeds is the parent of the
+ * remote end of port 0, endpoint 0. Works for devicetree, ACPI _DSD graphs
+ * and software nodes alike. The caller puts the returned handle.
+ */
+struct fwnode_handle *tsi_skylp_remote_encoder(const struct fwnode_handle *node);
 
 #endif /* _TSI_SKYLP_VB_H_ */

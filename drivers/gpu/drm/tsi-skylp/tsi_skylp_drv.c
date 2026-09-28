@@ -16,6 +16,14 @@
  *	encoder atomic_enable	train link, set pixel clock, enable stream
  *	plane atomic_update	program the buffer, then start the channel
  *
+ * The device is described by devicetree or by ACPI (PRP0001 with the same
+ * compatible and property names, an _DSD graph for the port, and the
+ * frame-done line as an Extended Interrupt whose ResourceSource is the UDI
+ * collector). Everything here goes through fwnode so both work; only
+ * crtc.port, which DRM types as a device_node, is set on devicetree, and the
+ * encoder's possible_crtcs is filled in after bind when the vendor driver
+ * could not derive it from an OF graph.
+ *
  * Page flips after that are one idle-slot write and a buffer-id switch
  * (see tsi_skylp_vb.c). The frame-done interrupt is the vblank. Without an
  * interrupt in the devicetree (routing unconfirmed, or a model without the
@@ -33,12 +41,14 @@
 #include <linux/of_graph.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 #include <linux/spinlock.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_drv.h>
+#include <drm/drm_encoder.h>
 #include <drm/drm_fb_dma_helper.h>
 #include <drm/drm_fbdev_dma.h>
 #include <drm/drm_fourcc.h>
@@ -421,6 +431,7 @@ static int tsi_skylp_bind(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tsi_skylp *p;
 	struct drm_device *drm;
+	struct drm_encoder *enc;
 	int ret;
 
 	p = devm_drm_dev_alloc(dev, &tsi_skylp_driver, struct tsi_skylp, drm);
@@ -436,11 +447,13 @@ static int tsi_skylp_bind(struct device *dev)
 	if (ret)
 		goto err_rmem;
 
-	/* the encoder resolves possible_crtcs against this port */
-	p->crtc.port = of_graph_get_port_by_id(dev->of_node, 0);
-	if (!p->crtc.port) {
-		ret = dev_err_probe(dev, -EINVAL, "no output port\n");
-		goto err_rmem;
+	/* on devicetree the encoder resolves possible_crtcs against this port */
+	if (dev->of_node) {
+		p->crtc.port = of_graph_get_port_by_id(dev->of_node, 0);
+		if (!p->crtc.port) {
+			ret = dev_err_probe(dev, -EINVAL, "no output port\n");
+			goto err_rmem;
+		}
 	}
 
 	ret = component_bind_all(dev, drm);
@@ -448,6 +461,15 @@ static int tsi_skylp_bind(struct device *dev)
 		dev_err_probe(dev, ret, "failed to bind the DP encoder\n");
 		goto err_port;
 	}
+
+	/*
+	 * Under ACPI the vendor encoder finds no OF graph and leaves
+	 * possible_crtcs at 0, which drm_dev_register() rejects. There is
+	 * exactly one CRTC here, so the answer is not in doubt.
+	 */
+	drm_for_each_encoder(enc, drm)
+		if (!enc->possible_crtcs)
+			enc->possible_crtcs = drm_crtc_mask(&p->crtc);
 
 	if (p->irq) {
 		ret = drm_vblank_init(drm, 1);
@@ -507,19 +529,31 @@ static const struct component_master_ops tsi_skylp_master_ops = {
 	.unbind	= tsi_skylp_unbind,
 };
 
+static int tsi_skylp_compare_fwnode(struct device *dev, void *data)
+{
+	return dev_fwnode(dev) == data;
+}
+
+static void tsi_skylp_release_fwnode(struct device *dev, void *data)
+{
+	fwnode_handle_put(data);
+}
+
 static int tsi_skylp_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct component_match *match = NULL;
-	struct device_node *remote;
+	struct fwnode_handle *remote;
 
 	/* one output port, one endpoint: the DP encoder */
-	remote = of_graph_get_remote_node(dev->of_node, 0, 0);
+	remote = tsi_skylp_remote_encoder(dev_fwnode(dev));
 	if (!remote)
 		return dev_err_probe(dev, -ENODEV, "output port has no remote\n");
 
-	drm_of_component_match_add(dev, &match, component_compare_of, remote);
-	of_node_put(remote);
+	component_match_add_release(dev, &match, tsi_skylp_release_fwnode,
+				    tsi_skylp_compare_fwnode, remote);
+	if (IS_ERR(match))
+		return PTR_ERR(match);
 
 	return component_master_add_with_match(dev, &tsi_skylp_master_ops, match);
 }
