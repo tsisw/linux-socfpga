@@ -13,7 +13,10 @@
  * pinctrl-tsi GPIO interrupt path is level-only and the pad routing of
  * CF802 is still an open hardware question, so edge interrupts cannot
  * be relied on yet. TODO: switch to interrupts once the routing and
- * trigger capabilities are confirmed.
+ * trigger capabilities are confirmed. What a poll does with the two
+ * samples, including a failed read, is tsi_skylp_plug_sync() in the
+ * core, where it is KUnit-tested; this file only reads the lines and
+ * reports.
  *
  * Copyright (c) 2026 Tsavorite Scalable Intelligence
  */
@@ -40,10 +43,9 @@ struct skylp_typec {
 	struct tsi_skylp_mux_cache cache;
 	struct mutex lock;		/* serialises mode/flip against apply */
 	u32 mode;
-	bool flip;
+	struct tsi_skylp_plug_state plug;
 	struct gpio_desc *plug_event;
 	struct gpio_desc *plug_flip;
-	bool present;
 	struct delayed_work work;
 	struct typec_switch_dev *sw;
 	struct typec_mux_dev *mux_dev;
@@ -61,9 +63,9 @@ static void skylp_typec_apply(struct skylp_typec *st)
 {
 	lockdep_assert_held(&st->lock);
 
-	if (tsi_skylp_mux_update(&st->cache, &st->hw, st->mode, st->flip))
+	if (tsi_skylp_mux_update(&st->cache, &st->hw, st->mode, st->plug.flip))
 		dev_dbg(st->dev, "lane mux set: mode %u, %s orientation\n",
-			st->mode, st->flip ? "flipped" : "normal");
+			st->mode, st->plug.flip ? "flipped" : "normal");
 }
 
 /*
@@ -78,7 +80,7 @@ static int skylp_typec_switch_set(struct typec_switch_dev *sw,
 	struct skylp_typec *st = typec_switch_get_drvdata(sw);
 
 	guard(mutex)(&st->lock);
-	st->flip = orientation == TYPEC_ORIENTATION_REVERSE;
+	st->plug.flip = orientation == TYPEC_ORIENTATION_REVERSE;
 	skylp_typec_apply(st);
 	return 0;
 }
@@ -101,23 +103,33 @@ static int skylp_typec_mux_set(struct typec_mux_dev *mux,
 	return 0;
 }
 
+/*
+ * One poll. Lines the board does not route are passed as their current
+ * state so the core sees "unchanged"; a read error keeps the last state.
+ */
 static void skylp_typec_sync(struct skylp_typec *st)
 {
+	int flip_raw, event_raw;
+	unsigned int ev;
+
 	guard(mutex)(&st->lock);
 
-	if (st->plug_flip)
-		st->flip = gpiod_get_value_cansleep(st->plug_flip);
+	flip_raw = st->plug_flip ? gpiod_get_value_cansleep(st->plug_flip) :
+				   st->plug.flip;
+	event_raw = st->plug_event ? gpiod_get_value_cansleep(st->plug_event) :
+				     st->plug.present;
+	ev = tsi_skylp_plug_sync(&st->plug, flip_raw, event_raw);
+
+	if (ev & TSI_SKYLP_PLUG_READ_FAILED)
+		dev_warn_ratelimited(st->dev,
+				     "plug gpio read failed (flip %d, event %d), keeping last state\n",
+				     flip_raw, event_raw);
 
 	skylp_typec_apply(st);
 
-	if (st->plug_event) {
-		bool present = gpiod_get_value_cansleep(st->plug_event);
-
-		if (present != st->present)
-			dev_info(st->dev, "plug %s\n",
-				 present ? "attached" : "detached");
-		st->present = present;
-	}
+	if (ev & TSI_SKYLP_PLUG_PRESENCE_CHANGED)
+		dev_info(st->dev, "plug %s\n",
+			 st->plug.present ? "attached" : "detached");
 }
 
 static void skylp_typec_poll(struct work_struct *work)

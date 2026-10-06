@@ -336,6 +336,73 @@ static void skylp_test_usb_parse_fwnode(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_parse(NULL, &init), -ENODEV);
 }
 
+/* The flip line drives orientation; a steady line reports no change. */
+static void skylp_test_plug_sync_follows_flip_line(struct kunit *test)
+{
+	struct tsi_skylp_plug_state s = { };
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 1, 0),
+			(unsigned int)TSI_SKYLP_PLUG_FLIP_CHANGED);
+	KUNIT_EXPECT_TRUE(test, s.flip);
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 1, 0), 0u);
+	KUNIT_EXPECT_TRUE(test, s.flip);
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 0, 0),
+			(unsigned int)TSI_SKYLP_PLUG_FLIP_CHANGED);
+	KUNIT_EXPECT_FALSE(test, s.flip);
+}
+
+/*
+ * A failed GPIO read is a negative errno. Treated as a boolean that is
+ * "set", which is the bug this guards against: one I2C timeout must not
+ * flip the lane mux and drop the link. Each line keeps its last state.
+ */
+static void skylp_test_plug_sync_read_error_keeps_last_state(struct kunit *test)
+{
+	struct tsi_skylp_plug_state s = { .flip = false, .present = true };
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, -EIO, 1),
+			(unsigned int)TSI_SKYLP_PLUG_READ_FAILED);
+	KUNIT_EXPECT_FALSE(test, s.flip);
+	KUNIT_EXPECT_TRUE(test, s.present);
+
+	s.flip = true;
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, -ETIMEDOUT, -EIO),
+			(unsigned int)TSI_SKYLP_PLUG_READ_FAILED);
+	KUNIT_EXPECT_TRUE(test, s.flip);
+	KUNIT_EXPECT_TRUE(test, s.present);
+
+	/* a good read on one line still lands while the other fails */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 0, -EIO),
+			(unsigned int)(TSI_SKYLP_PLUG_FLIP_CHANGED |
+				       TSI_SKYLP_PLUG_READ_FAILED));
+	KUNIT_EXPECT_FALSE(test, s.flip);
+	KUNIT_EXPECT_TRUE(test, s.present);
+}
+
+/* Attach and detach are each reported once, not on every poll. */
+static void skylp_test_plug_sync_reports_presence_edges_once(struct kunit *test)
+{
+	struct tsi_skylp_plug_state s = { };
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 0, 1),
+			(unsigned int)TSI_SKYLP_PLUG_PRESENCE_CHANGED);
+	KUNIT_EXPECT_TRUE(test, s.present);
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 0, 1), 0u);
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 0, 1), 0u);
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 0, 0),
+			(unsigned int)TSI_SKYLP_PLUG_PRESENCE_CHANGED);
+	KUNIT_EXPECT_FALSE(test, s.present);
+
+	/* both lines moving in one poll report both */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_plug_sync(&s, 1, 1),
+			(unsigned int)(TSI_SKYLP_PLUG_FLIP_CHANGED |
+				       TSI_SKYLP_PLUG_PRESENCE_CHANGED));
+}
+
 static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_mux_val_usb),
 	KUNIT_CASE(skylp_test_mux_val_usb_flipped),
@@ -350,6 +417,9 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_typec_dp_four_lane),
 	KUNIT_CASE(skylp_test_typec_dp_two_lane_keeps_usb),
 	KUNIT_CASE(skylp_test_typec_unknown_mode_rejected),
+	KUNIT_CASE(skylp_test_plug_sync_follows_flip_line),
+	KUNIT_CASE(skylp_test_plug_sync_read_error_keeps_last_state),
+	KUNIT_CASE(skylp_test_plug_sync_reports_presence_edges_once),
 	KUNIT_CASE(skylp_test_usb_parse_fwnode),
 	{}
 };

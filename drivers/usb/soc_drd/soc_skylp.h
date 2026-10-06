@@ -90,6 +90,26 @@ bool tsi_skylp_mux_update(struct tsi_skylp_mux_cache *cache,
  */
 int tsi_skylp_mux_mode_from_typec(unsigned long typec_mode, u32 *mux_mode);
 
+/* What the PD controller's plug lines last told us. */
+struct tsi_skylp_plug_state {
+	bool	flip;		/* USB_PLUG_FLIP: reversed orientation */
+	bool	present;	/* USB_PLUG_EVENT: a plug is attached */
+};
+
+#define TSI_SKYLP_PLUG_FLIP_CHANGED	BIT(0)
+#define TSI_SKYLP_PLUG_PRESENCE_CHANGED	BIT(1)
+#define TSI_SKYLP_PLUG_READ_FAILED	BIT(2)
+
+/*
+ * Fold one poll of the plug lines into @s. @flip_raw and @event_raw are
+ * gpiod_get_value() results: 0 or 1, or a negative errno for a failed
+ * read, which keeps that line's last state rather than being mistaken
+ * for a set line. A line the board does not route is passed as its
+ * current state. Returns TSI_SKYLP_PLUG_* bits for what changed.
+ */
+unsigned int tsi_skylp_plug_sync(struct tsi_skylp_plug_state *s,
+				 int flip_raw, int event_raw);
+
 struct device;
 
 /*

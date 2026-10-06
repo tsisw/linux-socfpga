@@ -103,6 +103,29 @@ int tsi_skylp_mux_mode_from_typec(unsigned long typec_mode, u32 *mux_mode)
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_mux_mode_from_typec);
 
+/* One line: a failed read keeps the last state and is reported, not applied. */
+static unsigned int tsi_skylp_plug_line(bool *state, int raw, unsigned int changed)
+{
+	bool now;
+
+	if (raw < 0)
+		return TSI_SKYLP_PLUG_READ_FAILED;
+	now = raw != 0;
+	if (now == *state)
+		return 0;
+	*state = now;
+	return changed;
+}
+
+unsigned int tsi_skylp_plug_sync(struct tsi_skylp_plug_state *s,
+				 int flip_raw, int event_raw)
+{
+	return tsi_skylp_plug_line(&s->flip, flip_raw, TSI_SKYLP_PLUG_FLIP_CHANGED) |
+	       tsi_skylp_plug_line(&s->present, event_raw,
+				   TSI_SKYLP_PLUG_PRESENCE_CHANGED);
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_plug_sync);
+
 /* Binder: DT + MMIO plumbing over the tested sequence core. */
 
 struct tsi_skylp_iomem {
