@@ -1117,10 +1117,11 @@ static void tsi_irq_ack(struct irq_data *d)
 
 /*
  * The collector is level-sensitive only and has no polarity register,
- * so active-high vs active-low cannot be programmed; handle_level_irq
- * is wired unconditionally at registration. Anything that is not
- * exactly a supported level type is rejected rather than silently
+ * so active-high vs active-low cannot be programmed. Anything that is
+ * not exactly a supported level type is rejected rather than silently
  * accepted, so a mixed edge+level request cannot look like success.
+ * Lines are registered on handle_bad_irq; tsi_irq_set_type() installs
+ * handle_level_irq only once a type has passed this check.
  */
 VISIBLE_IF_KUNIT int tsi_pinctrl_irq_type_valid(unsigned int type)
 {
