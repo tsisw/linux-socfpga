@@ -261,14 +261,20 @@ static int tsi_intc_probe(struct platform_device *pdev)
 
 	/*
 	 * Collector-group -> GIC routing is gap G3: without an answer the
-	 * firmware carries no parent interrupt and the instance stays
-	 * dormant (domain up, nothing dispatches).
+	 * firmware carries no parent interrupt (-ENXIO) and the instance
+	 * stays dormant (domain up, nothing dispatches). Any other failure,
+	 * a parent not yet up or a bad mapping, fails the probe instead of
+	 * producing a dormant chip that deferred probe would never retry.
 	 */
 	irq = platform_get_irq_optional(pdev, 0);
-	if (irq > 0)
+	if (irq > 0) {
 		irq_set_chained_handler_and_data(irq, tsi_intc_handler, ti);
-	else
+	} else if (irq == -ENXIO) {
 		dev_info(dev, "no parent interrupt, dormant (G3 open)\n");
+	} else {
+		irq_domain_remove(ti->domain);
+		return dev_err_probe(dev, irq, "parent interrupt\n");
+	}
 
 	platform_set_drvdata(pdev, ti);
 	return 0;
