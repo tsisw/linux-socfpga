@@ -294,7 +294,13 @@ static struct platform_driver tsi_intc_driver = {
 		.suppress_bind_attrs = true,
 	},
 };
-module_platform_driver(tsi_intc_driver);
+
+/*
+ * Built in only (Kconfig bool): the chained handler on the parent line and
+ * the irq domain stay registered for the life of the kernel, so there is
+ * no unload path for them to outlive.
+ */
+builtin_platform_driver(tsi_intc_driver);
 
 MODULE_DESCRIPTION("TSI SkyLP interrupt-collector irqchip");
 MODULE_LICENSE("GPL");

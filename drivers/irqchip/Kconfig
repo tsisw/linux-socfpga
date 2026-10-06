@@ -742,9 +742,9 @@ config SUNPLUS_SP7021_INTC
 	  the primary controller on C-Chip.
 
 config TSI_SKYLP_INTC
-	tristate "TSI SkyLP interrupt-collector irqchip"
+	bool "TSI SkyLP interrupt-collector irqchip"
 	depends on OF
-	depends on TSI_CHIPLET || COMPILE_TEST
+	depends on ARCH_TSI || COMPILE_TEST
 	select IRQ_DOMAIN
 	select REGMAP_MMIO
 	help
