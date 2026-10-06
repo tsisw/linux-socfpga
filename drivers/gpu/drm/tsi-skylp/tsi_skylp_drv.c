@@ -368,14 +368,17 @@ static int tsi_skylp_hw_init(struct tsi_skylp *p, struct platform_device *pdev)
 		return dev_err_probe(dev, ret, "failed to claim memory-region\n");
 	p->rmem = !ret;
 
+	/*
+	 * -ENXIO is the only "there is none": a malformed mapping or a
+	 * parent that is not up yet must not silently bind without vblank.
+	 */
 	p->irq = platform_get_irq_optional(pdev, 0);
-	if (p->irq == -EPROBE_DEFER) {
-		ret = -EPROBE_DEFER;
-		goto err_rmem;
-	}
-	if (p->irq < 0) {
+	if (p->irq == -ENXIO) {
 		dev_info(dev, "no frame-done interrupt, running without vblank\n");
 		p->irq = 0;
+	} else if (p->irq < 0) {
+		ret = dev_err_probe(dev, p->irq, "frame-done interrupt\n");
+		goto err_rmem;
 	}
 
 	p->hw.rd = tsi_skylp_rd;
