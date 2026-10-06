@@ -1029,6 +1029,19 @@ static const struct phy_ops soc_dp_phy_ops = {
 	.owner          = THIS_MODULE,
 };
 
+/* TSI: see the comment at its one call site in soc_dp_phy_probe(). */
+struct soc_dp_phy_lookup {
+	struct phy *phy;
+	const char *dev_id;
+};
+
+static void soc_dp_phy_lookup_remove(void *data)
+{
+	struct soc_dp_phy_lookup *lookup = data;
+
+	phy_remove_lookup(lookup->phy, "phy", lookup->dev_id);
+}
+
 static int soc_dp_phy_probe(struct platform_device *pdev)
 {
 	int i, ret;
@@ -1113,6 +1126,7 @@ static int soc_dp_phy_probe(struct platform_device *pdev)
 	 */
 	if (!dev->of_node) {
 		const char *consumer;
+		struct soc_dp_phy_lookup *lookup;
 
 		if (device_property_read_string(dev, "tsi,consumer", &consumer))
 			return dev_err_probe(dev, -EINVAL,
@@ -1120,6 +1134,28 @@ static int soc_dp_phy_probe(struct platform_device *pdev)
 		ret = phy_create_lookup(phy, "phy", consumer);
 		if (ret)
 			return ret;
+
+		/*
+		 * TSI: phy_create_lookup() is a plain kzalloc() on a global,
+		 * non-devm list (drivers/phy/phy-core.c); nothing unwinds it
+		 * when devm_phy_create()'s phy is freed on unbind, which
+		 * leaves a stale pointer for the next phy_find() to return.
+		 * Tie the matching phy_remove_lookup() to this device's
+		 * teardown. Registered after devm_phy_create()'s own action,
+		 * so devm's LIFO order runs this first: the lookup is gone
+		 * before the phy it points to is destroyed.
+		 */
+		lookup = devm_kzalloc(dev, sizeof(*lookup), GFP_KERNEL);
+		if (!lookup) {
+			phy_remove_lookup(phy, "phy", consumer);
+			return -ENOMEM;
+		}
+		lookup->phy = phy;
+		lookup->dev_id = consumer;
+		ret = devm_add_action_or_reset(dev, soc_dp_phy_lookup_remove, lookup);
+		if (ret)
+			return ret;
+
 		for (i = 0; i < SOC_DP_PHY_MAX_STREAMS; i++) {
 			char con_id[16];
 
