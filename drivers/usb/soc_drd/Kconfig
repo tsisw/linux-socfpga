@@ -17,6 +17,7 @@ if USB_SOC_DRD
 
 choice
 	bool "SOC USB Mode Selection"
+	default USB_SOC_DRD_DUAL_ROLE if (USB && USB_GADGET)
 	default USB_SOC_DRD_HOST if (USB && !USB_GADGET)
 	default USB_SOC_DRD_GADGET if (!USB && USB_GADGET)
 
