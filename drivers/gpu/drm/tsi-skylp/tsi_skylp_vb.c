@@ -121,17 +121,21 @@ EXPORT_SYMBOL_GPL(tsi_vb_format_code);
 
 /**
  * tsi_vb_check_scanout - can the bridge scan out this buffer?
+ * @st: scanout state of the channel the buffer is for
  * @addr: bus address of the first visible pixel
  * @pitch: line stride in bytes
  * @height: visible lines
  * @fourcc: DRM_FORMAT_*
  *
  * Return: 0; -EINVAL for an unsupported format or a stride outside the
- * 16-bit LINE_STRIDE field; -ERANGE if the buffer reaches past 40 bits or
- * crosses a 4 GiB boundary (ADDR_HIGH_8BIT is one byte shared by the whole
- * scan).
+ * 16-bit LINE_STRIDE field; -ERANGE if the buffer reaches past 40 bits,
+ * crosses a 4 GiB boundary, or, while the channel runs, lies in a different
+ * 4 GiB region from the frame on screen. ADDR_HIGH_8BIT is one byte shared
+ * by both slots, so the active slot would read from the new region as soon
+ * as the byte changed, before FRAME_BUFID switched.
  */
-int tsi_vb_check_scanout(u64 addr, u32 pitch, u32 height, u32 fourcc)
+int tsi_vb_check_scanout(const struct tsi_vb_state *st, u64 addr, u32 pitch,
+			 u32 height, u32 fourcc)
 {
 	u32 code;
 	u64 end;
@@ -145,6 +149,8 @@ int tsi_vb_check_scanout(u64 addr, u32 pitch, u32 height, u32 fourcc)
 	if (end < addr || end >> TSI_VB_DMA_ADDR_BITS)
 		return -ERANGE;
 	if (upper_32_bits(addr) != upper_32_bits(end))
+		return -ERANGE;
+	if (st->started && upper_32_bits(addr) != st->addr_high)
 		return -ERANGE;
 	return 0;
 }
@@ -212,6 +218,7 @@ void tsi_vb_set_scanout(const struct tsi_vb_hw *hw, struct tsi_vb_state *st,
 	ch_wr(hw, TSI_VB_FORMAT, FIELD_PREP(TSI_VB_FORMAT_BUFID, slot) |
 				 FIELD_PREP(TSI_VB_FORMAT_CODE, code));
 	st->slot = slot;
+	st->addr_high = upper_32_bits(addr);
 }
 EXPORT_SYMBOL_GPL(tsi_vb_set_scanout);
 

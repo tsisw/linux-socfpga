@@ -116,12 +116,14 @@ struct tsi_vb_hw {
 struct tsi_vb_state {
 	bool started;
 	unsigned int slot;
+	u32 addr_high;		/* upper 32 bits of the buffers while started */
 };
 
 int tsi_vb_timing_from_mode(const struct drm_display_mode *mode,
 			    struct tsi_vb_timing *t);
 int tsi_vb_format_code(u32 fourcc, u32 *code);
-int tsi_vb_check_scanout(u64 addr, u32 pitch, u32 height, u32 fourcc);
+int tsi_vb_check_scanout(const struct tsi_vb_state *st, u64 addr, u32 pitch,
+			 u32 height, u32 fourcc);
 
 void tsi_vb_set_timing(const struct tsi_vb_hw *hw,
 		       const struct tsi_vb_timing *t);

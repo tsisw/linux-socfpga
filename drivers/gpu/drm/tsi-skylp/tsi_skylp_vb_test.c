@@ -170,21 +170,58 @@ static void vb_format_codes(struct kunit *test)
 static void vb_check_scanout_limits(struct kunit *test)
 {
 	const u32 fmt = DRM_FORMAT_XRGB8888;
+	const struct tsi_vb_state idle = { };
 
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0x80000000ULL, 7680, 1080, fmt), 0);
+	/* the plain limits, with nothing on screen */
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0x80000000ULL, 7680, 1080, fmt), 0);
 	/* highest byte the bridge can address */
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0xff00000000ULL, 7680, 1080, fmt), 0);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0xff00000000ULL, 7680, 1080, fmt), 0);
 	/* beyond 40 bits */
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0x10000000000ULL, 7680, 1080, fmt), -ERANGE);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0x10000000000ULL, 7680, 1080, fmt),
+			-ERANGE);
 	/* ends past 40 bits */
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0xffffff0000ULL, 7680, 1080, fmt), -ERANGE);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0xffffff0000ULL, 7680, 1080, fmt),
+			-ERANGE);
 	/* straddles a 4 GiB boundary: the shared high byte cannot follow */
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0x1ffff0000ULL, 7680, 1080, fmt), -ERANGE);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0x1ffff0000ULL, 7680, 1080, fmt),
+			-ERANGE);
 	/* pitch is a 16-bit field */
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0x80000000ULL, 0x10000, 16, fmt), -EINVAL);
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0x80000000ULL, 0, 16, fmt), -EINVAL);
-	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(0x80000000ULL, 7680, 1080,
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0x80000000ULL, 0x10000, 16, fmt),
+			-EINVAL);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0x80000000ULL, 0, 16, fmt), -EINVAL);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&idle, 0x80000000ULL, 7680, 1080,
 						   DRM_FORMAT_RGB565), -EINVAL);
+}
+
+/*
+ * ADDR_HIGH_8BIT is one byte shared by both slots. While a frame is being
+ * scanned out, a flip to a buffer in another 4 GiB region would rewrite
+ * that byte under the active slot, so such a buffer must be refused until
+ * the channel is stopped.
+ */
+static void vb_check_scanout_rejects_region_change_while_running(struct kunit *test)
+{
+	struct tsi_vb_hw hw;
+	struct fake_vb *f = fake_init(test, &hw, 0);
+	struct tsi_vb_state st = { };
+	const u32 fmt = DRM_FORMAT_XRGB8888;
+
+	KUNIT_ASSERT_NOT_NULL(test, f);
+	/* nothing running: any region may be the first */
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&st, 0x180000000ULL, 7680, 1080, fmt), 0);
+
+	tsi_vb_set_scanout(&hw, &st, 0x80000000ULL, 7680, TSI_VB_FMT_ARGB8888);
+	tsi_vb_start(&hw, &st);
+
+	/* same region as the frame on screen */
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&st, 0x81000000ULL, 7680, 1080, fmt), 0);
+	/* another region: would redirect the active slot mid-frame */
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&st, 0x180000000ULL, 7680, 1080, fmt),
+			-ERANGE);
+
+	/* stopped: the next scanout can start anywhere again */
+	tsi_vb_stop(&hw, &st);
+	KUNIT_EXPECT_EQ(test, tsi_vb_check_scanout(&st, 0x180000000ULL, 7680, 1080, fmt), 0);
 }
 
 static void vb_set_timing_programs_channel_and_dp_mode(struct kunit *test)
@@ -441,6 +478,7 @@ static struct kunit_case tsi_vb_cases[] = {
 	KUNIT_CASE(vb_timing_rejects_zero_sync),
 	KUNIT_CASE(vb_format_codes),
 	KUNIT_CASE(vb_check_scanout_limits),
+	KUNIT_CASE(vb_check_scanout_rejects_region_change_while_running),
 	KUNIT_CASE(vb_set_timing_programs_channel_and_dp_mode),
 	KUNIT_CASE(vb_first_scanout_uses_slot0),
 	KUNIT_CASE(vb_flip_alternates_slots),

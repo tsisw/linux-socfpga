@@ -123,7 +123,8 @@ static int tsi_skylp_plane_atomic_check(struct drm_plane *plane,
 	if (ret || !ps->visible)
 		return ret;
 
-	return tsi_vb_check_scanout(drm_fb_dma_get_gem_addr(ps->fb, ps, 0),
+	return tsi_vb_check_scanout(&to_tsi(plane->dev)->st,
+				    drm_fb_dma_get_gem_addr(ps->fb, ps, 0),
 				    ps->fb->pitches[0], drm_rect_height(&ps->dst),
 				    ps->fb->format->format);
 }
