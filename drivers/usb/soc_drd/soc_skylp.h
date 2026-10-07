@@ -12,8 +12,12 @@
  *   - >= 100 us must elapse after por_n release before operation
  *     (databook §5.2, Table 24).
  *
- * Deliberately DT-driven (values pending databook section mapping,
- * HW-8/HW-9): the TSAR block-control and UDI refclk-select values.
+ * Deliberately DT-driven: the TSAR block-control value (still pending,
+ * HW-8/HW-9) and the UDI refclk-select value (bit layout confirmed by
+ * the hardware team on 2026-10-07 - see TSI_SKYLP_CLKSEL_*; which bits
+ * a board sets is still its own choice). The UDI reset-release window
+ * (udi_reset_cfg, bit map confirmed the same day) is optional too:
+ * absent when firmware releases the resets before Linux boots.
  *
  * Copyright (c) 2026 Tsavorite Scalable Intelligence
  */
@@ -37,10 +41,44 @@
 
 #define TSI_SKYLP_POR_SETTLE_US		100	/* databook §5.2 minimum */
 
+/*
+ * gpp udi_clk_sel fields (hardware team, 2026-10-07):
+ * {29'h0, div2_clken, refclk100m_sel, refclk_sel}. div2_clken divides
+ * the 50 MHz FREF by two for the controller's ref_clk pin, which
+ * Innosilicon spec at 24 MHz and confirmed working at 25 MHz.
+ */
+#define TSI_SKYLP_CLKSEL_REFCLK_SEL	BIT(0)	/* 0 single-ended, 1 differential */
+#define TSI_SKYLP_CLKSEL_REFCLK100M_SEL	BIT(1)	/* 0 50M FREF, 1 100M FREF_100M */
+#define TSI_SKYLP_CLKSEL_DIV2_CLKEN	BIT(2)	/* ref_clk = FREF / 2 */
+
+/*
+ * gpp udi_reset_cfg (hardware team, 2026-10-07): active-low reset
+ * releases, set = out of reset. Layout
+ * {22'h0, aud_axi_aresetn_1, aud_axi_aresetn_0, aud_rst_n,
+ *  vid_axi_aresetn_1, vid_axi_aresetn_0, dptx_sys_rstn,
+ *  usb_axi_aresetn, apb_presetn, ahb_hresetn, por_n}.
+ */
+#define TSI_SKYLP_RST_POR_N		BIT(0)
+#define TSI_SKYLP_RST_AHB_HRESETN	BIT(1)
+#define TSI_SKYLP_RST_APB_PRESETN	BIT(2)
+#define TSI_SKYLP_RST_USB_AXI_ARESETN	BIT(3)
+#define TSI_SKYLP_RST_DPTX_SYS_RSTN	BIT(4)
+#define TSI_SKYLP_RST_VID_AXI_ARESETN_0	BIT(5)
+#define TSI_SKYLP_RST_VID_AXI_ARESETN_1	BIT(6)
+#define TSI_SKYLP_RST_AUD_RST_N		BIT(7)
+#define TSI_SKYLP_RST_AUD_AXI_ARESETN_0	BIT(8)
+#define TSI_SKYLP_RST_AUD_AXI_ARESETN_1	BIT(9)
+
+/* What USB bring-up releases; dptx/vid/aud belong to their own drivers. */
+#define TSI_SKYLP_RST_USB_SET		(TSI_SKYLP_RST_AHB_HRESETN |	\
+					 TSI_SKYLP_RST_APB_PRESETN |	\
+					 TSI_SKYLP_RST_USB_AXI_ARESETN)
+
 /* Register slots the sequence may touch, resolved by the binder. */
 enum tsi_skylp_reg {
 	TSI_SKYLP_REG_TSAR,	/* gpp tsar_control */
 	TSI_SKYLP_REG_CLKSEL,	/* gpp udi_clk_sel */
+	TSI_SKYLP_REG_RESET,	/* gpp udi_reset_cfg */
 	TSI_SKYLP_REG_MUX,	/* apb Type-C lane mux */
 	TSI_SKYLP_REG_GCTL,	/* controller GCTL (power-down scale) */
 	TSI_SKYLP_REG_GUCTL,	/* controller GUCTL (refclk period) */
@@ -55,21 +93,25 @@ struct tsi_skylp_hw {
 };
 
 /*
- * The controller's ref_clk and suspend_clk are 50 MHz on SkyLP (HW-5),
- * while the RTL defaults assume 24 MHz (GUCTL.REFCLKPER = 41 ns) and
- * ~25 MHz (GCTL.PWRDNSCALE = 1560). Field positions are those of the
- * DWC3 layout the vendor's own GCTL definitions follow, and match the
- * reset values the hardware team quoted.
+ * The UDI reference is a 50 MHz FREF (HW-5); the controller's ref_clk
+ * pin sees that directly, or 25 MHz when udi_clk_sel.div2_clken
+ * divides it (the Innosilicon pin spec is 24 MHz, confirmed working at
+ * 25 MHz, 2026-10-07). The RTL defaults assume 24 MHz
+ * (GUCTL.REFCLKPER = 41 ns) and ~25 MHz (GCTL.PWRDNSCALE = 1560).
+ * Field positions are those of the DWC3 layout the vendor's own GCTL
+ * definitions follow, and match the reset values the hardware team
+ * quoted.
  */
-#define TSI_SKYLP_USB_REF_CLK_HZ	50000000UL
+#define TSI_SKYLP_USB_FREF_HZ		50000000UL
 #define TSI_SKYLP_GCTL_PWRDNSCALE	GENMASK(31, 19)	/* ref_clk / 16 kHz */
 #define TSI_SKYLP_GUCTL_REFCLKPER	GENMASK(31, 22)	/* ref_clk period, ns */
 
 struct tsi_skylp_init {
 	bool	has_tsar;
 	u32	tsar_val;	/* DT tsi,tsar-init (HW-8 pending) */
+	bool	has_reset;	/* tsi-reset window mapped by the binder */
 	bool	has_clksel;
-	u32	clksel_val;	/* DT tsi,clksel-init (HW-4/27 pending) */
+	u32	clksel_val;	/* DT tsi,clksel-init (TSI_SKYLP_CLKSEL_*) */
 	u32	mux_mode;	/* TSI_SKYLP_MUX_MODE_* */
 	bool	mux_flip;
 };
@@ -93,6 +135,19 @@ int tsi_skylp_usb_init_seq(const struct tsi_skylp_hw *hw,
  */
 int tsi_skylp_usb_refclk_seq(const struct tsi_skylp_hw *hw,
 			     unsigned long ref_clk_hz);
+/*
+ * Release the UDI resets USB needs: por_n, the validated >= 100 us
+ * settle, then AHB/APB/USB-AXI in one read-modify-write that leaves
+ * the dptx/vid/aud releases alone. Bits already set are not rewritten,
+ * so a firmware-initialised part sees no writes and no delay. Needs
+ * hw->rd for TSI_SKYLP_REG_RESET.
+ */
+void tsi_skylp_usb_reset_seq(const struct tsi_skylp_hw *hw);
+/*
+ * The controller ref_clk rate the board's clksel choice produces:
+ * FREF/2 when the sequence will set div2_clken, FREF otherwise.
+ */
+unsigned long tsi_skylp_usb_ref_clk_hz(const struct tsi_skylp_init *init);
 /*
  * Fill @init from a firmware node (DT, ACPI _DSD or software node). Returns
  * -ENODEV unless the node is compatible with tsi,skylp-usb, -EINVAL for an

@@ -111,13 +111,14 @@ static void skylp_test_seq_full_order(struct kunit *test)
 	struct tsi_skylp_hw hw = test_hw(&log);
 	struct tsi_skylp_init init = {
 		.has_tsar = true,	.tsar_val = 0xa5,
+		.has_reset = true,
 		.has_clksel = true,	.clksel_val = 0x1,
 		.mux_mode = TSI_SKYLP_MUX_MODE_USB,
 		.mux_flip = false,
 	};
 
 	KUNIT_ASSERT_EQ(test, tsi_skylp_usb_init_seq(&hw, &init), 0);
-	KUNIT_ASSERT_EQ(test, log.nops, 4);
+	KUNIT_ASSERT_EQ(test, log.nops, 7);
 
 	KUNIT_EXPECT_EQ(test, log.ops[0].kind, OP_WR);
 	KUNIT_EXPECT_EQ(test, log.ops[0].reg, TSI_SKYLP_REG_TSAR);
@@ -126,13 +127,24 @@ static void skylp_test_seq_full_order(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, log.ops[1].kind, OP_DELAY);
 	KUNIT_EXPECT_GE(test, log.ops[1].val, 100u);
 
+	/* resets next: por_n, settle, then the three USB bus releases */
 	KUNIT_EXPECT_EQ(test, log.ops[2].kind, OP_WR);
-	KUNIT_EXPECT_EQ(test, log.ops[2].reg, TSI_SKYLP_REG_CLKSEL);
+	KUNIT_EXPECT_EQ(test, log.ops[2].reg, TSI_SKYLP_REG_RESET);
 	KUNIT_EXPECT_EQ(test, log.ops[2].val, 0x1u);
+	KUNIT_EXPECT_EQ(test, log.ops[3].kind, OP_DELAY);
+	KUNIT_EXPECT_GE(test, log.ops[3].val, 100u);
+	KUNIT_EXPECT_EQ(test, log.ops[4].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[4].reg, TSI_SKYLP_REG_RESET);
+	KUNIT_EXPECT_EQ(test, log.ops[4].val, 0xfu);
 
-	KUNIT_EXPECT_EQ(test, log.ops[3].kind, OP_WR);
-	KUNIT_EXPECT_EQ(test, log.ops[3].reg, TSI_SKYLP_REG_MUX);
-	KUNIT_EXPECT_EQ(test, log.ops[3].val, 0x7000u);
+	KUNIT_EXPECT_EQ(test, log.ops[5].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[5].reg, TSI_SKYLP_REG_CLKSEL);
+	KUNIT_EXPECT_EQ(test, log.ops[5].val, 0x1u);
+
+	/* and the mux write stays dead last: it sits behind apb_presetn */
+	KUNIT_EXPECT_EQ(test, log.ops[6].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[6].reg, TSI_SKYLP_REG_MUX);
+	KUNIT_EXPECT_EQ(test, log.ops[6].val, 0x7000u);
 }
 
 /* no tsar/clksel values yet: no writes for them, no settle delay,
@@ -184,6 +196,89 @@ static void skylp_test_seq_rejects_bad_mode(struct kunit *test)
 
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_init_seq(&hw, &init), -EINVAL);
 	KUNIT_EXPECT_EQ(test, log.nops, 0);
+}
+
+/*
+ * udi_reset_cfg bit map per the hardware team (2026-10-07):
+ * {22'h0, aud_axi_aresetn_1, aud_axi_aresetn_0, aud_rst_n,
+ *  vid_axi_aresetn_1, vid_axi_aresetn_0, dptx_sys_rstn,
+ *  usb_axi_aresetn, apb_presetn, ahb_hresetn, por_n} - active-low
+ * releases, so set = out of reset. USB needs por_n (bit 0), then the
+ * validated >= 100 us settle, then bits 1..3 in one write - without
+ * touching the DP/video/audio releases other drivers own.
+ */
+static void skylp_test_reset_seq_por_then_buses(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	/* dptx (bit 4) already released by the display driver: survives */
+	log.regs[TSI_SKYLP_REG_RESET] = 0x10;
+
+	tsi_skylp_usb_reset_seq(&hw);
+	KUNIT_ASSERT_EQ(test, log.nops, 3);
+	KUNIT_EXPECT_EQ(test, log.ops[0].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[0].reg, TSI_SKYLP_REG_RESET);
+	KUNIT_EXPECT_EQ(test, log.ops[0].val, 0x11u);
+	KUNIT_EXPECT_EQ(test, log.ops[1].kind, OP_DELAY);
+	KUNIT_EXPECT_GE(test, log.ops[1].val, 100u);
+	KUNIT_EXPECT_EQ(test, log.ops[2].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[2].val, 0x1fu);
+}
+
+/* a part firmware already brought up sees no writes and no settle */
+static void skylp_test_reset_seq_noop_when_released(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	log.regs[TSI_SKYLP_REG_RESET] = 0xf;
+	tsi_skylp_usb_reset_seq(&hw);
+	KUNIT_EXPECT_EQ(test, log.nops, 0);
+}
+
+/* por_n already out: the settle is long past, one bus-release write */
+static void skylp_test_reset_seq_skips_settle_when_por_out(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	log.regs[TSI_SKYLP_REG_RESET] = 0x1;
+	tsi_skylp_usb_reset_seq(&hw);
+	KUNIT_ASSERT_EQ(test, log.nops, 1);
+	KUNIT_EXPECT_EQ(test, log.ops[0].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[0].val, 0xfu);
+}
+
+/*
+ * The controller's ref_clk pin is the 50 MHz FREF, or 25 MHz when
+ * udi_clk_sel.div2_clken (bit 2, hardware team 2026-10-07) divides it:
+ * Innosilicon spec the pin at 24 MHz and confirmed 25 MHz operation.
+ */
+static void skylp_test_ref_clk_follows_div2(struct kunit *test)
+{
+	struct tsi_skylp_init init = {};
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
+	init.has_clksel = true;
+	init.clksel_val = 0x3;	/* refclk_sel | refclk100m_sel, no div2 */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
+	init.clksel_val = 0x4;	/* div2_clken */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 25000000UL);
+	/* a clksel value the sequence will not write cannot divide */
+	init.has_clksel = false;
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
+}
+
+/* 25 MHz: period 40 ns, scale 25 MHz / 16 kHz = 1562 */
+static void skylp_test_refclk_seq_programs_25mhz(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	KUNIT_ASSERT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 25000000UL), 0);
+	KUNIT_EXPECT_EQ(test, log.regs[TSI_SKYLP_REG_GUCTL], 40u << 22);
+	KUNIT_EXPECT_EQ(test, log.regs[TSI_SKYLP_REG_GCTL], 1562u << 19);
 }
 
 /* first update always writes; repeating the same state writes nothing;
@@ -474,6 +569,11 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_refclk_seq_programs_50mhz),
 	KUNIT_CASE(skylp_test_refclk_seq_skips_when_current),
 	KUNIT_CASE(skylp_test_refclk_seq_rejects_unencodable_rate),
+	KUNIT_CASE(skylp_test_reset_seq_por_then_buses),
+	KUNIT_CASE(skylp_test_reset_seq_noop_when_released),
+	KUNIT_CASE(skylp_test_reset_seq_skips_settle_when_por_out),
+	KUNIT_CASE(skylp_test_ref_clk_follows_div2),
+	KUNIT_CASE(skylp_test_refclk_seq_programs_25mhz),
 	KUNIT_CASE(skylp_test_mux_update_writes_only_on_change),
 	KUNIT_CASE(skylp_test_typec_state_safe_is_no_connection),
 	KUNIT_CASE(skylp_test_typec_state_usb),

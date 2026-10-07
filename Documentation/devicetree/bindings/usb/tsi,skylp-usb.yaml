@@ -23,9 +23,17 @@ description: |
   link.
 
   The TSAR and clock-select VALUES are intentionally DT-supplied
-  (tsi,tsar-init / tsi,clksel-init): their bit assignments are still
-  being confirmed with the hardware team, and a step is skipped when
-  its property is absent. The mux write always happens.
+  (tsi,tsar-init / tsi,clksel-init); a step is skipped when its
+  property is absent, and the mux write always happens. The TSAR bit
+  assignment is still being confirmed with the hardware team; the
+  clock-select bits are documented under tsi,clksel-init below.
+
+  The optional UDI reset-release window (gpp udi_reset_cfg) is
+  window-gated rather than value-gated: a board that declares it wants
+  Linux to release por_n (with the validated >= 100 us settle after
+  it) and the AHB/APB/USB-AXI resets; one that leaves it out had
+  firmware release them. The driver read-modify-writes the word, so
+  the DP/video/audio release bits stay with their own drivers.
 
   All windows are standalone MMIO ranges and must be left out of any
   tsi,skylp-chiplet node's "reg". The tsar/clksel words are mapped
@@ -47,6 +55,7 @@ properties:
       - description: Type-C lane-mux word
       - description: TSAR block-control word
       - description: UDI reference-clock-select word
+      - description: UDI reset-release word (gpp udi_reset_cfg)
 
   reg-names:
     minItems: 2
@@ -55,6 +64,7 @@ properties:
       - const: tsi-mux
       - const: tsi-tsar
       - const: tsi-clksel
+      - const: tsi-reset
 
   interrupts:
     maxItems: 1
@@ -90,9 +100,17 @@ properties:
 
   tsi,clksel-init:
     $ref: /schemas/types.yaml#/definitions/uint32
-    description:
+    maximum: 0x7
+    description: |
       Value written to the UDI reference-clock-select word before the
-      mux write. Requires the tsi-clksel window.
+      mux write. Requires the tsi-clksel window. Bits (hardware team,
+      2026-10-07):
+        bit 0  refclk_sel       0 single-ended, 1 differential reference
+        bit 1  refclk100m_sel   0 use 50 MHz FREF, 1 use FREF_100M
+        bit 2  div2_clken       feed the controller ref_clk FREF / 2
+      With div2_clken set the driver programs the controller for a
+      25 MHz ref_clk (GUCTL.REFCLKPER, GCTL.PWRDNSCALE); otherwise for
+      the full 50 MHz FREF.
 
   tsi,mux-mode:
     $ref: /schemas/types.yaml#/definitions/uint32

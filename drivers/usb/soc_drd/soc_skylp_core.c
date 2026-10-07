@@ -50,6 +50,9 @@ int tsi_skylp_usb_init_seq(const struct tsi_skylp_hw *hw,
 		hw->wr(hw->ctx, TSI_SKYLP_REG_TSAR, init->tsar_val);
 		hw->delay_us(hw->ctx, TSI_SKYLP_POR_SETTLE_US);
 	}
+	/* Resets before the mux: its APB word sits behind apb_presetn. */
+	if (init->has_reset)
+		tsi_skylp_usb_reset_seq(hw);
 	if (init->has_clksel)
 		hw->wr(hw->ctx, TSI_SKYLP_REG_CLKSEL, init->clksel_val);
 
@@ -92,6 +95,45 @@ int tsi_skylp_usb_refclk_seq(const struct tsi_skylp_hw *hw,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_refclk_seq);
+
+/*
+ * Release the UDI resets USB needs (udi_reset_cfg, bit map from the
+ * hardware team 2026-10-07): por_n first with the validated >= 100 us
+ * settle after it, then ahb_hresetn/apb_presetn/usb_axi_aresetn in one
+ * write. Read-modify-write throughout, so the dptx/vid/aud releases
+ * owned by the display and audio drivers are never disturbed, and bits
+ * already out of reset are not rewritten - a firmware-initialised part
+ * sees no writes and no settle delay.
+ */
+void tsi_skylp_usb_reset_seq(const struct tsi_skylp_hw *hw)
+{
+	u32 cur = hw->rd(hw->ctx, TSI_SKYLP_REG_RESET);
+
+	if (!(cur & TSI_SKYLP_RST_POR_N)) {
+		cur |= TSI_SKYLP_RST_POR_N;
+		hw->wr(hw->ctx, TSI_SKYLP_REG_RESET, cur);
+		hw->delay_us(hw->ctx, TSI_SKYLP_POR_SETTLE_US);
+	}
+	if ((cur | TSI_SKYLP_RST_USB_SET) != cur)
+		hw->wr(hw->ctx, TSI_SKYLP_REG_RESET,
+		       cur | TSI_SKYLP_RST_USB_SET);
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_usb_reset_seq);
+
+/*
+ * What the controller's ref_clk pin will run at once the sequence has
+ * applied the board's clksel choice: half the 50 MHz FREF when
+ * div2_clken is among the bits to be written, the full FREF otherwise.
+ * A clksel the sequence will not write (no window/property) leaves the
+ * divider at its reset state, which does not divide.
+ */
+unsigned long tsi_skylp_usb_ref_clk_hz(const struct tsi_skylp_init *init)
+{
+	if (init->has_clksel && (init->clksel_val & TSI_SKYLP_CLKSEL_DIV2_CLKEN))
+		return TSI_SKYLP_USB_FREF_HZ / 2;
+	return TSI_SKYLP_USB_FREF_HZ;
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_usb_ref_clk_hz);
 
 /*
  * Runtime mux update (plug/flip interrupt path): write only when the
@@ -236,6 +278,7 @@ int tsi_skylp_usb_init(struct device *dev)
 	struct tsi_skylp_init init;
 	struct tsi_skylp_iomem *io;
 	struct tsi_skylp_hw hw = {
+		.rd = tsi_skylp_iomem_rd,
 		.wr = tsi_skylp_iomem_wr,
 		.delay_us = tsi_skylp_iomem_delay,
 	};
@@ -289,6 +332,16 @@ int tsi_skylp_usb_init(struct device *dev)
 					     "tsi,clksel-init without tsi-clksel window\n");
 	}
 
+	/*
+	 * Window-gated, not property-gated: a board that declares the
+	 * udi_reset_cfg word wants Linux to release the USB resets; one
+	 * that leaves it out had firmware do it.
+	 */
+	io->regs[TSI_SKYLP_REG_RESET] = tsi_skylp_map(pdev, "tsi-reset", 4);
+	init.has_reset = io->regs[TSI_SKYLP_REG_RESET] != NULL;
+	if (!init.has_reset)
+		dev_info(dev, "no tsi-reset window: UDI resets assumed released\n");
+
 	ret = tsi_skylp_usb_init_seq(&hw, &init);
 	if (ret)
 		return ret;
@@ -321,7 +374,7 @@ int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals)
 		.ctx = &io,
 	};
 	struct tsi_skylp_init init;
-	unsigned long period, scale;
+	unsigned long ref_clk_hz, period, scale;
 	u32 gctl, guctl;
 	int ret;
 
@@ -338,7 +391,8 @@ int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals)
 	gctl = readl(io.regs[TSI_SKYLP_REG_GCTL]);
 	guctl = readl(io.regs[TSI_SKYLP_REG_GUCTL]);
 
-	ret = tsi_skylp_usb_refclk_seq(&hw, TSI_SKYLP_USB_REF_CLK_HZ);
+	ref_clk_hz = tsi_skylp_usb_ref_clk_hz(&init);
+	ret = tsi_skylp_usb_refclk_seq(&hw, ref_clk_hz);
 	if (ret)
 		return dev_err_probe(dev, ret, "refclk period / power-down scale\n");
 
@@ -349,11 +403,11 @@ int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals)
 	period = FIELD_GET(TSI_SKYLP_GUCTL_REFCLKPER, readl(io.regs[TSI_SKYLP_REG_GUCTL]));
 	scale = FIELD_GET(TSI_SKYLP_GCTL_PWRDNSCALE, readl(io.regs[TSI_SKYLP_REG_GCTL]));
 	dev_info(dev, "refclk %lu Hz: GUCTL.REFCLKPER %lu -> %lu ns, GCTL.PWRDNSCALE %lu -> %lu\n",
-		 TSI_SKYLP_USB_REF_CLK_HZ,
+		 ref_clk_hz,
 		 FIELD_GET(TSI_SKYLP_GUCTL_REFCLKPER, guctl), period,
 		 FIELD_GET(TSI_SKYLP_GCTL_PWRDNSCALE, gctl), scale);
-	if (period != DIV_ROUND_CLOSEST(NSEC_PER_SEC, TSI_SKYLP_USB_REF_CLK_HZ) ||
-	    scale != TSI_SKYLP_USB_REF_CLK_HZ / 16000)
+	if (period != DIV_ROUND_CLOSEST(NSEC_PER_SEC, ref_clk_hz) ||
+	    scale != ref_clk_hz / 16000)
 		dev_warn(dev, "refclk fields did not take the written values\n");
 	return 0;
 }
