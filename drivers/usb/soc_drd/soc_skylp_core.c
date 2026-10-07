@@ -9,6 +9,7 @@
  * Copyright (c) 2026 Tsavorite Scalable Intelligence
  */
 
+#include <linux/bitfield.h>
 #include <linux/bits.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -24,6 +25,7 @@
 #include <linux/usb/typec_altmode.h>
 #include <linux/usb/typec_dp.h>
 
+#include "soc_core.h"		/* GLOBALS window offsets of GCTL/GUCTL */
 #include "soc_skylp.h"
 
 u32 tsi_skylp_mux_val(u32 mode, bool flip)
@@ -57,6 +59,39 @@ int tsi_skylp_usb_init_seq(const struct tsi_skylp_hw *hw,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_init_seq);
+
+/* Read-modify-write one field; skip the write when it already holds @val. */
+static void tsi_skylp_set_field(const struct tsi_skylp_hw *hw,
+				enum tsi_skylp_reg reg, u32 mask, u32 val)
+{
+	u32 cur = hw->rd(hw->ctx, reg);
+	u32 want = (cur & ~mask) | (val & mask);
+
+	if (want != cur)
+		hw->wr(hw->ctx, reg, want);
+}
+
+int tsi_skylp_usb_refclk_seq(const struct tsi_skylp_hw *hw,
+			     unsigned long ref_clk_hz)
+{
+	unsigned long period_ns, scale;
+
+	if (!ref_clk_hz)
+		return -EINVAL;
+
+	period_ns = DIV_ROUND_CLOSEST(NSEC_PER_SEC, ref_clk_hz);
+	scale = ref_clk_hz / 16000;	/* PWRDNSCALE: ref_clk in 16 kHz units */
+	if (!period_ns || period_ns > FIELD_MAX(TSI_SKYLP_GUCTL_REFCLKPER) ||
+	    !scale || scale > FIELD_MAX(TSI_SKYLP_GCTL_PWRDNSCALE))
+		return -ERANGE;
+
+	tsi_skylp_set_field(hw, TSI_SKYLP_REG_GUCTL, TSI_SKYLP_GUCTL_REFCLKPER,
+			    FIELD_PREP(TSI_SKYLP_GUCTL_REFCLKPER, period_ns));
+	tsi_skylp_set_field(hw, TSI_SKYLP_REG_GCTL, TSI_SKYLP_GCTL_PWRDNSCALE,
+			    FIELD_PREP(TSI_SKYLP_GCTL_PWRDNSCALE, scale));
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_usb_refclk_seq);
 
 /*
  * Runtime mux update (plug/flip interrupt path): write only when the
@@ -129,7 +164,7 @@ EXPORT_SYMBOL_GPL(tsi_skylp_plug_sync);
 /* Binder: DT + MMIO plumbing over the tested sequence core. */
 
 struct tsi_skylp_iomem {
-	void __iomem *regs[3];	/* indexed by enum tsi_skylp_reg */
+	void __iomem *regs[TSI_SKYLP_REG_COUNT];	/* indexed by enum tsi_skylp_reg */
 };
 
 static void tsi_skylp_iomem_wr(void *ctx, enum tsi_skylp_reg reg, u32 val)
@@ -137,6 +172,13 @@ static void tsi_skylp_iomem_wr(void *ctx, enum tsi_skylp_reg reg, u32 val)
 	struct tsi_skylp_iomem *io = ctx;
 
 	writel(val, io->regs[reg]);
+}
+
+static u32 tsi_skylp_iomem_rd(void *ctx, enum tsi_skylp_reg reg)
+{
+	struct tsi_skylp_iomem *io = ctx;
+
+	return readl(io->regs[reg]);
 }
 
 static void tsi_skylp_iomem_delay(void *ctx, unsigned int us)
@@ -244,6 +286,34 @@ int tsi_skylp_usb_init(struct device *dev)
 	return tsi_skylp_usb_init_seq(&hw, &init);
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_init);
+
+int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals)
+{
+	struct tsi_skylp_iomem io = { };
+	struct tsi_skylp_hw hw = {
+		.rd = tsi_skylp_iomem_rd,
+		.wr = tsi_skylp_iomem_wr,
+		.ctx = &io,
+	};
+	struct tsi_skylp_init init;
+	int ret;
+
+	ret = tsi_skylp_usb_parse(dev_fwnode(dev), &init);
+	if (ret == -ENODEV)
+		return 0;	/* not a SkyLP node: vendor defaults */
+	if (ret)
+		return ret;
+
+	/* soc_usb's regs point at the GLOBALS window; offsets are xHCI-based. */
+	io.regs[TSI_SKYLP_REG_GCTL] = globals + SOC_USB_GCTL - SOC_USB_GLOBALS_REGS_START;
+	io.regs[TSI_SKYLP_REG_GUCTL] = globals + SOC_USB_GUCTL - SOC_USB_GLOBALS_REGS_START;
+
+	ret = tsi_skylp_usb_refclk_seq(&hw, TSI_SKYLP_USB_REF_CLK_HZ);
+	if (ret)
+		return dev_err_probe(dev, ret, "refclk period / power-down scale\n");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tsi_skylp_usb_core_init);
 
 MODULE_DESCRIPTION("TSI SkyLP USB init-sequence core");
 MODULE_LICENSE("GPL");

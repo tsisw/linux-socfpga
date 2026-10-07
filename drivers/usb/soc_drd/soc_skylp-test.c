@@ -36,7 +36,15 @@ struct op_log {
 		u32 val;		/* written value, or delay in us */
 	} ops[LOG_MAX];
 	int nops;
+	u32 regs[TSI_SKYLP_REG_COUNT];	/* what a read returns; writes land here */
 };
+
+static u32 log_rd(void *ctx, enum tsi_skylp_reg reg)
+{
+	struct op_log *log = ctx;
+
+	return log->regs[reg];
+}
 
 static void log_wr(void *ctx, enum tsi_skylp_reg reg, u32 val)
 {
@@ -48,6 +56,7 @@ static void log_wr(void *ctx, enum tsi_skylp_reg reg, u32 val)
 		log->ops[log->nops].val = val;
 	}
 	log->nops++;
+	log->regs[reg] = val;
 }
 
 static void log_delay(void *ctx, unsigned int us)
@@ -64,6 +73,7 @@ static void log_delay(void *ctx, unsigned int us)
 static struct tsi_skylp_hw test_hw(struct op_log *log)
 {
 	return (struct tsi_skylp_hw){
+		.rd = log_rd,
 		.wr = log_wr,
 		.delay_us = log_delay,
 		.ctx = log,
@@ -403,6 +413,56 @@ static void skylp_test_plug_sync_reports_presence_edges_once(struct kunit *test)
 				       TSI_SKYLP_PLUG_PRESENCE_CHANGED));
 }
 
+/*
+ * 50 MHz: period 20 ns into GUCTL[31:22], scale 50 MHz / 16 kHz = 3125
+ * into GCTL[31:19]. The RTL reset values (41 ns, 1560) are what is
+ * replaced; every other bit of both registers is kept.
+ */
+static void skylp_test_refclk_seq_programs_50mhz(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+	const u32 gctl_rest = 0x00012004;	/* PRTCAP, U2RSTECN, U2EXIT_LFPS */
+	const u32 guctl_rest = 0x0000c0ab;
+
+	log.regs[TSI_SKYLP_REG_GCTL] = (1560u << 19) | gctl_rest;
+	log.regs[TSI_SKYLP_REG_GUCTL] = (41u << 22) | guctl_rest;
+
+	KUNIT_ASSERT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 50000000UL), 0);
+	KUNIT_ASSERT_EQ(test, log.nops, 2);
+	KUNIT_EXPECT_EQ(test, log.ops[0].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.ops[1].kind, OP_WR);
+	KUNIT_EXPECT_EQ(test, log.regs[TSI_SKYLP_REG_GUCTL], (20u << 22) | guctl_rest);
+	KUNIT_EXPECT_EQ(test, log.regs[TSI_SKYLP_REG_GCTL], (3125u << 19) | gctl_rest);
+}
+
+/* Already programmed: nothing is written, so a resume re-run is free. */
+static void skylp_test_refclk_seq_skips_when_current(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	log.regs[TSI_SKYLP_REG_GCTL] = 3125u << 19;
+	log.regs[TSI_SKYLP_REG_GUCTL] = 20u << 22;
+
+	KUNIT_ASSERT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 50000000UL), 0);
+	KUNIT_EXPECT_EQ(test, log.nops, 0);
+}
+
+/* A rate the fields cannot encode is refused before anything is written. */
+static void skylp_test_refclk_seq_rejects_unencodable_rate(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 0), -EINVAL);
+	/* 200 MHz: scale 12500 does not fit 13 bits */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 200000000UL), -ERANGE);
+	/* 500 kHz: period 2000 ns does not fit 10 bits */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 500000UL), -ERANGE);
+	KUNIT_EXPECT_EQ(test, log.nops, 0);
+}
+
 static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_mux_val_usb),
 	KUNIT_CASE(skylp_test_mux_val_usb_flipped),
@@ -411,6 +471,9 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_seq_mux_only),
 	KUNIT_CASE(skylp_test_seq_tsar_only_keeps_settle),
 	KUNIT_CASE(skylp_test_seq_rejects_bad_mode),
+	KUNIT_CASE(skylp_test_refclk_seq_programs_50mhz),
+	KUNIT_CASE(skylp_test_refclk_seq_skips_when_current),
+	KUNIT_CASE(skylp_test_refclk_seq_rejects_unencodable_rate),
 	KUNIT_CASE(skylp_test_mux_update_writes_only_on_change),
 	KUNIT_CASE(skylp_test_typec_state_safe_is_no_connection),
 	KUNIT_CASE(skylp_test_typec_state_usb),

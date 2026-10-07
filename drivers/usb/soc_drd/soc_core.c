@@ -686,6 +686,16 @@ static int soc_usb_core_init(struct soc_usb *su)
 		goto err_ret;
 
 	soc_usb_core_setup_global_control(su);
+
+	/*
+	 * TSI SkyLP: the 50 MHz ref_clk/suspend_clk into GUCTL.REFCLKPER and
+	 * GCTL.PWRDNSCALE, after the soft reset as dwc3 does (gaps G2/G8).
+	 * Nodes without the SkyLP compatible return 0 untouched.
+	 */
+	ret = tsi_skylp_usb_core_init(su->dev, su->regs);
+	if (ret)
+		goto err_ret;
+
 	soc_usb_core_num_eps(su);
 
 	ret = soc_usb_event_buffers_setup(su);

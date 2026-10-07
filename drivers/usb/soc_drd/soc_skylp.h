@@ -42,13 +42,28 @@ enum tsi_skylp_reg {
 	TSI_SKYLP_REG_TSAR,	/* gpp tsar_control */
 	TSI_SKYLP_REG_CLKSEL,	/* gpp udi_clk_sel */
 	TSI_SKYLP_REG_MUX,	/* apb Type-C lane mux */
+	TSI_SKYLP_REG_GCTL,	/* controller GCTL (power-down scale) */
+	TSI_SKYLP_REG_GUCTL,	/* controller GUCTL (refclk period) */
+	TSI_SKYLP_REG_COUNT,
 };
 
 struct tsi_skylp_hw {
+	u32 (*rd)(void *ctx, enum tsi_skylp_reg reg);	/* GCTL/GUCTL only */
 	void (*wr)(void *ctx, enum tsi_skylp_reg reg, u32 val);
 	void (*delay_us)(void *ctx, unsigned int us);
 	void *ctx;
 };
+
+/*
+ * The controller's ref_clk and suspend_clk are 50 MHz on SkyLP (HW-5),
+ * while the RTL defaults assume 24 MHz (GUCTL.REFCLKPER = 41 ns) and
+ * ~25 MHz (GCTL.PWRDNSCALE = 1560). Field positions are those of the
+ * DWC3 layout the vendor's own GCTL definitions follow, and match the
+ * reset values the hardware team quoted.
+ */
+#define TSI_SKYLP_USB_REF_CLK_HZ	50000000UL
+#define TSI_SKYLP_GCTL_PWRDNSCALE	GENMASK(31, 19)	/* ref_clk / 16 kHz */
+#define TSI_SKYLP_GUCTL_REFCLKPER	GENMASK(31, 22)	/* ref_clk period, ns */
 
 struct tsi_skylp_init {
 	bool	has_tsar;
@@ -70,6 +85,14 @@ struct tsi_skylp_mux_cache {
 u32 tsi_skylp_mux_val(u32 mode, bool flip);
 int tsi_skylp_usb_init_seq(const struct tsi_skylp_hw *hw,
 			   const struct tsi_skylp_init *init);
+/*
+ * Program GUCTL.REFCLKPER and GCTL.PWRDNSCALE for @ref_clk_hz, keeping
+ * every other bit of both registers. Runs after the controller's core
+ * soft reset, where dwc3 does the same. -EINVAL for a zero rate, -ERANGE
+ * when a field cannot hold the value.
+ */
+int tsi_skylp_usb_refclk_seq(const struct tsi_skylp_hw *hw,
+			     unsigned long ref_clk_hz);
 /*
  * Fill @init from a firmware node (DT, ACPI _DSD or software node). Returns
  * -ENODEV unless the node is compatible with tsi,skylp-usb, -EINVAL for an
@@ -119,8 +142,21 @@ struct device;
  */
 #if IS_REACHABLE(CONFIG_USB_SOC_DRD_SKYLP)
 int tsi_skylp_usb_init(struct device *dev);
+/*
+ * Post-reset hook for soc_usb's core init: on a "tsi,skylp-usb" node
+ * runs tsi_skylp_usb_refclk_seq() over the controller's global registers
+ * (@globals is soc_usb's regs pointer, the GLOBALS window). Other nodes
+ * return 0 untouched.
+ */
+int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals);
 #else
 static inline int tsi_skylp_usb_init(struct device *dev)
+{
+	return 0;
+}
+
+static inline int tsi_skylp_usb_core_init(struct device *dev,
+					  void __iomem *globals)
 {
 	return 0;
 }
