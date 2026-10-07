@@ -221,7 +221,8 @@ static ssize_t soc_dp_hw_aux_transfer(struct drm_dp_aux *aux,
 
 	if (ret) {
 		phy_power_off(dp->phy);
-		dev_err(dp->dev, "AUX transfer timeout\n");
+		dev_err(dp->dev, "AUX transfer timeout (req %#x addr %#x len %zu)\n",
+			msg->request, msg->address, msg->size);
 		return ret;
 	}
 
@@ -235,16 +236,21 @@ static ssize_t soc_dp_hw_aux_transfer(struct drm_dp_aux *aux,
 	case DP_AUX_NATIVE_REPLY_NACK:
 		/* Return 0 bytes transferred on NACK to trigger upper-layer retry */
 		phy_power_off(dp->phy);
+		dev_dbg(dp->dev, "AUX req %#x addr %#x len %zu: NACK\n",
+			msg->request, msg->address, msg->size);
 		return 0;
 	case DP_AUX_NATIVE_REPLY_DEFER:
 		phy_power_off(dp->phy);
+		dev_dbg(dp->dev, "AUX req %#x addr %#x len %zu: DEFER\n",
+			msg->request, msg->address, msg->size);
 		return -EBUSY;
 	default:
 		/* Evaluate hardware protocol errors (Fail-fast before status check) */
 		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_REPLY_ERR, &val);
 		if (val) {
 			soc_dp_reg_read_range(dp, SOC_DPTX_AUX_REPLY_ERR_CODE, &err_code);
-			dev_err(dp->dev, "AUX physical/protocol error, code: 0x%x\n", err_code);
+			dev_err(dp->dev, "AUX physical/protocol error, code: 0x%x (req %#x addr %#x)\n",
+				err_code, msg->request, msg->address);
 		}
 		phy_power_off(dp->phy);
 		return -EIO;
@@ -262,6 +268,8 @@ static ssize_t soc_dp_hw_aux_transfer(struct drm_dp_aux *aux,
 	}
 
 	phy_power_off(dp->phy);
+	dev_dbg(dp->dev, "AUX req %#x addr %#x len %zu: ACK\n",
+		msg->request, msg->address, msg->size);
 	return msg->size;
 }
 #endif
@@ -1495,9 +1503,14 @@ static void soc_dp_hpd_poll_work(struct work_struct *work)
 
 	mutex_unlock(&dp->mode_lock);
 
-	if (sink_irq_detected
-			&& new_status == connector_status_connected)
+	if (sink_irq_detected &&
+	    new_status == connector_status_connected) {
+		/* TSI: under SOC_DP_HPD_BYPASS this fires on every poll */
+		dev_dbg_ratelimited(dp->dev, "servicing sink IRQ%s\n",
+				    IS_ENABLED(CONFIG_SOC_DP_HPD_BYPASS) ?
+				    " (always reported under HPD bypass)" : "");
 		soc_dp_handle_sink_irq(dp);
+	}
 
 	if (new_status != old_status) {
 		soc_dp_mode_update(dp);
@@ -1625,6 +1638,7 @@ static int soc_dp_dev_init(struct soc_dp_dev *dp)
 	soc_dp_reg_write_range(dp, SOC_DPTX_FORCE_HPD, 0x1);
 	mdelay(5);
 	dp->connector_status = connector_status_connected;
+	dev_info(dp->dev, "HPD forced on (no HPD pin): connector reported connected\n");
 #else
 	dp->connector_status = soc_dp_detect_hpd(dp);
 #endif

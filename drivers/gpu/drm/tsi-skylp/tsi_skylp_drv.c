@@ -42,11 +42,13 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/seq_file.h>
 #include <linux/spinlock.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc.h>
+#include <drm/drm_debugfs.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_encoder.h>
 #include <drm/drm_fb_dma_helper.h>
@@ -78,6 +80,11 @@ struct tsi_skylp {
 	spinlock_t lock;
 	int irq;
 	bool rmem;
+
+	/* written only by the IRQ handler; read by debugfs scanout_stats */
+	u64 frames;
+	u64 underflows;
+	u64 axi_errors;
 };
 
 static inline struct tsi_skylp *to_tsi(struct drm_device *drm)
@@ -134,20 +141,30 @@ static void tsi_skylp_plane_atomic_update(struct drm_plane *plane,
 {
 	struct drm_plane_state *ps = drm_atomic_get_new_plane_state(state, plane);
 	struct tsi_skylp *p = to_tsi(plane->dev);
+	dma_addr_t addr;
 	unsigned long flags;
+	unsigned int slot;
+	bool first;
 	u32 code;
 
 	if (!ps->fb || !ps->visible)
 		return;
 	if (WARN_ON(tsi_vb_format_code(ps->fb->format->format, &code)))
 		return;
+	addr = drm_fb_dma_get_gem_addr(ps->fb, ps, 0);
 
 	spin_lock_irqsave(&p->lock, flags);
-	tsi_vb_set_scanout(&p->hw, &p->st, drm_fb_dma_get_gem_addr(ps->fb, ps, 0),
-			   ps->fb->pitches[0], code);
-	if (!p->st.started)
+	tsi_vb_set_scanout(&p->hw, &p->st, addr, ps->fb->pitches[0], code);
+	slot = p->st.slot;
+	first = !p->st.started;
+	if (first)
 		tsi_vb_start(&p->hw, &p->st);
 	spin_unlock_irqrestore(&p->lock, flags);
+
+	/* logged outside the lock: nothing printed with interrupts off */
+	drm_dbg_kms(&p->drm, "scanout slot %u: %pad, pitch %u, %p4cc%s\n",
+		    slot, &addr, ps->fb->pitches[0], &ps->fb->format->format,
+		    first ? ", channel started" : "");
 }
 
 static const struct drm_plane_helper_funcs tsi_skylp_plane_helper_funcs = {
@@ -207,6 +224,10 @@ static void tsi_skylp_crtc_atomic_enable(struct drm_crtc *crtc,
 
 	if (WARN_ON(tsi_vb_timing_from_mode(&cs->adjusted_mode, &t)))
 		return;
+
+	drm_dbg_kms(&p->drm, "timing %ux%u, h %u/%u/%u, v %u/%u/%u (fp/sync/bp), sync %c/%c\n",
+		    t.hactive, t.vactive, t.hfp, t.hsw, t.hbp, t.vfp, t.vsw, t.vbp,
+		    t.hsync_pos ? '+' : '-', t.vsync_pos ? '+' : '-');
 
 	/* the plane update starts the channel once it has a buffer */
 	tsi_vb_set_timing(&p->hw, &t);
@@ -308,15 +329,36 @@ static irqreturn_t tsi_skylp_irq(int irq, void *arg)
 	if (!status)
 		return IRQ_NONE;
 
-	if (status & TSI_VB_STATUS_UNDERFLOW)
+	if (status & TSI_VB_STATUS_UNDERFLOW) {
+		WRITE_ONCE(p->underflows, p->underflows + 1);
 		dev_warn_ratelimited(dev, "scanout FIFO underflow\n");
-	if (status & (TSI_VB_STATUS_ID_ERR | TSI_VB_STATUS_RESP_ERR))
+	}
+	if (status & (TSI_VB_STATUS_ID_ERR | TSI_VB_STATUS_RESP_ERR)) {
+		WRITE_ONCE(p->axi_errors, p->axi_errors + 1);
 		dev_err_ratelimited(dev, "scanout AXI read error, status %#x\n",
 				    status);
-	if (status & TSI_VB_STATUS_FRAME_DONE)
+	}
+	if (status & TSI_VB_STATUS_FRAME_DONE) {
+		if (!p->frames)
+			dev_info(dev, "first frame done: scanout DMA is running\n");
+		WRITE_ONCE(p->frames, p->frames + 1);
 		drm_crtc_handle_vblank(&p->crtc);
+	}
 
 	return IRQ_HANDLED;
+}
+
+static int tsi_skylp_stats_show(struct seq_file *m, void *unused)
+{
+	struct drm_debugfs_entry *entry = m->private;
+	struct tsi_skylp *p = to_tsi(entry->dev);
+
+	seq_printf(m, "frames_done\t%llu\nunderflows\t%llu\naxi_errors\t%llu\n",
+		   READ_ONCE(p->frames), READ_ONCE(p->underflows),
+		   READ_ONCE(p->axi_errors));
+	seq_printf(m, "started\t%d\nslot\t%u\nirq\t%d\n",
+		   READ_ONCE(p->st.started), READ_ONCE(p->st.slot), p->irq);
+	return 0;
 }
 
 /* --------------------------------------------------------------- device */
@@ -390,6 +432,11 @@ static int tsi_skylp_hw_init(struct tsi_skylp *p, struct platform_device *pdev)
 	/* quiesce whatever a bootloader left running */
 	tsi_vb_stop(&p->hw, &p->st);
 	tsi_vb_irq_ack(&p->hw);
+
+	dev_info(dev, "regs %pR, %u-bit DMA, buffers from %s, frame-done irq %d\n",
+		 platform_get_resource(pdev, IORESOURCE_MEM, 0), TSI_VB_DMA_ADDR_BITS,
+		 p->rmem ? "the reserved memory-region" : "the default DMA pool",
+		 p->irq);
 	return 0;
 
 err_rmem:
@@ -489,6 +536,7 @@ static int tsi_skylp_bind(struct device *dev)
 
 	drm_mode_config_reset(drm);
 	drm_kms_helper_poll_init(drm);
+	drm_debugfs_add_file(drm, "scanout_stats", tsi_skylp_stats_show, NULL);
 
 	ret = drm_dev_register(drm, 0);
 	if (ret)

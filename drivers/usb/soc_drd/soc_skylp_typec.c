@@ -125,8 +125,14 @@ static void skylp_typec_sync(struct skylp_typec *st)
 				     "plug gpio read failed (flip %d, event %d), keeping last state\n",
 				     flip_raw, event_raw);
 
+	if (ev & (TSI_SKYLP_PLUG_FLIP_CHANGED | TSI_SKYLP_PLUG_PRESENCE_CHANGED))
+		dev_dbg(st->dev, "plug lines: flip %d, event %d\n", flip_raw, event_raw);
+
 	skylp_typec_apply(st);
 
+	if (ev & TSI_SKYLP_PLUG_FLIP_CHANGED)
+		dev_info(st->dev, "orientation %s\n",
+			 st->plug.flip ? "reversed" : "normal");
 	if (ev & TSI_SKYLP_PLUG_PRESENCE_CHANGED)
 		dev_info(st->dev, "plug %s\n",
 			 st->plug.present ? "attached" : "detached");

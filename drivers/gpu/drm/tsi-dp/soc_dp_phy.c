@@ -703,7 +703,10 @@ static int soc_dp_check_pll_lock(struct soc_dp_phy_priv *priv)
 	pll_locked = 1;
 #endif
 	if (!pll_locked) {
-		dev_err(priv->dev, "Pre_pll unlocked\n");
+		/* TSI: say whether the core PLL locked, to tell the two apart */
+		soc_dp_reg_read_range(priv, SOC_DPTX_AD_LOCK_COREPLL, &pll_locked);
+		dev_err(priv->dev, "Pre_pll unlocked (core PLL lock %u, ref_clock %u kHz)\n",
+			pll_locked, priv->ref_clk_khz);
 		return -EINVAL;
 	}
 
@@ -713,10 +716,12 @@ static int soc_dp_check_pll_lock(struct soc_dp_phy_priv *priv)
 	pll_locked = 1;
 #endif
 	if (!pll_locked) {
-		dev_err(priv->dev, "Post_pll unlocked\n");
+		dev_err(priv->dev, "Post_pll unlocked (ref_clock %u kHz)\n",
+			priv->ref_clk_khz);
 		return -EINVAL;
 	}
 
+	dev_dbg(priv->dev, "pixel and core PLLs locked\n");
 	return 0;
 }
 
