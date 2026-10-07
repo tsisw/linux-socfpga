@@ -643,6 +643,12 @@ static int soc_dp_phy_pixel_clk_apply(struct soc_dp_phy_priv *priv,
 	if (ret)
 		return ret;
 
+	/* TSI: the divider choice, which the vendor log does not show */
+	dev_dbg(priv->dev, "pixel PLL %u: %u -> %u kHz, VCO %u kHz, pre %u fb %u frac %u, div5 %u divaux %u divm %u divp %u\n",
+		stream_id, pixel_clk_khz, cfg.actual_pclk_khz, cfg.vco_freq_khz,
+		cfg.prediv, cfg.fbdiv, cfg.frac, cfg.div5_en, cfg.divaux,
+		cfg.divm, cfg.divp);
+
 	soc_dp_mst_calc_pixel_pll_to_reg(priv, stream_id, &cfg);
 	priv->pixel_rate_hz[stream_id] = (unsigned long)cfg.actual_pclk_khz * 1000;
 
@@ -830,6 +836,11 @@ static int soc_dp_phy_config_rate(struct soc_dp_phy_priv *priv, int rate_khz)
 		dev_err(priv->dev, "Failed to calc core PLL\n");
 		return ret;
 	}
+	/* TSI: the divider choice, which the vendor log does not show */
+	dev_dbg(priv->dev, "core PLL: %d -> %u kHz, VCO %u kHz, pre %u fb %u frac %u, postdiv %u en %u\n",
+		rate_khz, core_pll_cfg.actual_rate_khz, core_pll_cfg.vco_freq_khz,
+		core_pll_cfg.prediv, core_pll_cfg.fbdiv, core_pll_cfg.frac,
+		core_pll_cfg.postdiv_reg, core_pll_cfg.postdiv_en);
 
 	soc_dp_calc_core_pll_to_reg(priv, &core_pll_cfg);
 	priv->link_rate_khz = rate_khz;
@@ -1082,6 +1093,10 @@ static int soc_dp_phy_probe(struct platform_device *pdev)
 	 */
 	if (device_property_read_u32(dev, "ref_clock", &priv->ref_clk_khz))
 		return dev_err_probe(dev, -EINVAL, "ref_clock (kHz) not described\n");
+	dev_info(dev, "ref_clock %u kHz, FPGA limits %s, stream stride %#x\n",
+		 priv->ref_clk_khz,
+		 IS_ENABLED(CONFIG_SOC_DP_FPGA_LIMITS) ? "on" : "off",
+		 SOC_DPTX_STREAM_OFFSET);
 
 	phy = devm_phy_create(&pdev->dev, NULL, &soc_dp_phy_ops);
 	if (IS_ERR(phy)) {

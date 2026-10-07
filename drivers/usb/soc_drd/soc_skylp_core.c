@@ -207,6 +207,7 @@ static void __iomem *tsi_skylp_map(struct platform_device *pdev,
 		res = platform_get_resource(pdev, IORESOURCE_MEM, index);
 	if (!res)
 		return NULL;
+	dev_info(&pdev->dev, "%s window %pR\n", name, res);
 	return devm_ioremap(&pdev->dev, res->start, resource_size(res));
 }
 
@@ -247,6 +248,11 @@ int tsi_skylp_usb_init(struct device *dev)
 	if (ret)
 		return dev_err_probe(dev, ret, "bad tsi,mux-mode\n");
 
+	dev_info(dev, "SkyLP init: mux mode %u flip %u, tsar-init %#x (%s), clksel-init %#x (%s)\n",
+		 init.mux_mode, init.mux_flip,
+		 init.tsar_val, init.has_tsar ? "applied" : "absent, reset value kept",
+		 init.clksel_val, init.has_clksel ? "applied" : "absent, reset value kept");
+
 	/*
 	 * soc_drd itself consumes no clocks at all (gap G8) - unlike dwc3,
 	 * which does a clk_bulk_get. Enable whatever the DT lists for this
@@ -283,7 +289,26 @@ int tsi_skylp_usb_init(struct device *dev)
 					     "tsi,clksel-init without tsi-clksel window\n");
 	}
 
-	return tsi_skylp_usb_init_seq(&hw, &init);
+	ret = tsi_skylp_usb_init_seq(&hw, &init);
+	if (ret)
+		return ret;
+
+	/*
+	 * Read the mux back. A value other than the one written means the
+	 * write did not land: wrong window, a blocked bus, or a register the
+	 * hardware owns (HW-36).
+	 */
+	{
+		u32 want = tsi_skylp_mux_val(init.mux_mode, init.mux_flip);
+		u32 got = readl(io->regs[TSI_SKYLP_REG_MUX]);
+
+		if (got == want)
+			dev_info(dev, "lane mux %#010x (written and read back)\n", got);
+		else
+			dev_warn(dev, "lane mux wrote %#010x, reads %#010x: write did not land (HW-36?)\n",
+				 want, got);
+	}
+	return 0;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_init);
 
@@ -296,6 +321,8 @@ int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals)
 		.ctx = &io,
 	};
 	struct tsi_skylp_init init;
+	unsigned long period, scale;
+	u32 gctl, guctl;
 	int ret;
 
 	ret = tsi_skylp_usb_parse(dev_fwnode(dev), &init);
@@ -308,9 +335,26 @@ int tsi_skylp_usb_core_init(struct device *dev, void __iomem *globals)
 	io.regs[TSI_SKYLP_REG_GCTL] = globals + SOC_USB_GCTL - SOC_USB_GLOBALS_REGS_START;
 	io.regs[TSI_SKYLP_REG_GUCTL] = globals + SOC_USB_GUCTL - SOC_USB_GLOBALS_REGS_START;
 
+	gctl = readl(io.regs[TSI_SKYLP_REG_GCTL]);
+	guctl = readl(io.regs[TSI_SKYLP_REG_GUCTL]);
+
 	ret = tsi_skylp_usb_refclk_seq(&hw, TSI_SKYLP_USB_REF_CLK_HZ);
 	if (ret)
 		return dev_err_probe(dev, ret, "refclk period / power-down scale\n");
+
+	/*
+	 * The field positions are inferred from the DWC3 layout (see
+	 * soc_skylp.h); this readback is what confirms them on silicon.
+	 */
+	period = FIELD_GET(TSI_SKYLP_GUCTL_REFCLKPER, readl(io.regs[TSI_SKYLP_REG_GUCTL]));
+	scale = FIELD_GET(TSI_SKYLP_GCTL_PWRDNSCALE, readl(io.regs[TSI_SKYLP_REG_GCTL]));
+	dev_info(dev, "refclk %lu Hz: GUCTL.REFCLKPER %lu -> %lu ns, GCTL.PWRDNSCALE %lu -> %lu\n",
+		 TSI_SKYLP_USB_REF_CLK_HZ,
+		 FIELD_GET(TSI_SKYLP_GUCTL_REFCLKPER, guctl), period,
+		 FIELD_GET(TSI_SKYLP_GCTL_PWRDNSCALE, gctl), scale);
+	if (period != DIV_ROUND_CLOSEST(NSEC_PER_SEC, TSI_SKYLP_USB_REF_CLK_HZ) ||
+	    scale != TSI_SKYLP_USB_REF_CLK_HZ / 16000)
+		dev_warn(dev, "refclk fields did not take the written values\n");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_core_init);

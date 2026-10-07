@@ -47,6 +47,7 @@ struct irq_domain;
 #define TSI_INTC_NR_GROUPS	4
 
 struct tsi_intc {
+	struct device		*dev;		/* for diagnostics only */
 	struct regmap		*regmap;
 	u32			base;		/* collector origin in regmap */
 	u32			dest_grp;	/* g0..g3 this instance owns */

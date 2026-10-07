@@ -525,6 +525,10 @@ static int soc_dp_link_train_clock_recovery(struct soc_dp_dev *dp, enum soc_dp_l
 			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
 			return ret;
 		}
+		/* TSI: DPCD 0x202-0x207, lane status and the sink's adjust request */
+		dev_dbg(dp->dev, "CR try %d (rate %d, %d lanes): link status %*ph, training set %*ph\n",
+			retries, rate, lanes, DP_LINK_STATUS_SIZE, link_status,
+			(int)lanes, training_set);
 
 		if (drm_dp_clock_recovery_ok(link_status, lanes))
 #else
@@ -611,6 +615,10 @@ static int soc_dp_link_train_channel_eq(struct soc_dp_dev *dp, enum soc_dp_link_
 			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
 			return ret;
 		}
+		/* TSI: DPCD 0x202-0x207, lane status and the sink's adjust request */
+		dev_dbg(dp->dev, "EQ try %d (rate %d, %d lanes): link status %*ph, training set %*ph\n",
+			retries, rate, lanes, DP_LINK_STATUS_SIZE, link_status,
+			(int)lanes, training_set);
 
 		if (drm_dp_channel_eq_ok(link_status, lanes)) {
 #else

@@ -204,7 +204,14 @@ static void tsi_intc_fire(unsigned int hwirq, void *cookie)
 {
 	struct tsi_intc *ti = cookie;
 
-	generic_handle_domain_irq(ti->domain, hwirq);
+	/*
+	 * A pending, enabled source nobody has mapped has no flow to EOI it,
+	 * so its latch stays set and the parent keeps firing. Say so.
+	 */
+	if (generic_handle_domain_irq(ti->domain, hwirq))
+		dev_warn_ratelimited(ti->dev,
+				     "source %u pending with no handler mapped, latch not cleared\n",
+				     hwirq);
 }
 
 /* Chained on the parent (GIC) IRQ. */
@@ -234,6 +241,7 @@ static int tsi_intc_probe(struct platform_device *pdev)
 	ti = devm_kzalloc(dev, sizeof(*ti), GFP_KERNEL);
 	if (!ti)
 		return -ENOMEM;
+	ti->dev = dev;
 
 	base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
 	if (IS_ERR(base))
@@ -274,6 +282,22 @@ static int tsi_intc_probe(struct platform_device *pdev)
 	} else {
 		irq_domain_remove(ti->domain);
 		return dev_err_probe(dev, irq, "parent interrupt\n");
+	}
+
+	/*
+	 * State at probe: anything already pending here was left by firmware
+	 * and fires as soon as its consumer unmasks it.
+	 */
+	{
+		u32 pend = 0, glb = 0, gen = 0, gip = 0;
+
+		regmap_read(ti->regmap, ti->base + TSI_INTC_PENDING, &pend);
+		regmap_read(ti->regmap, ti->base + TSI_INTC_GLB_EN, &glb);
+		regmap_read(ti->regmap, tsi_intc_grp_reg(ti, TSI_INTC_GRP_EN), &gen);
+		regmap_read(ti->regmap, tsi_intc_grp_reg(ti, TSI_INTC_GRP_IP), &gip);
+		dev_info(dev, "group %u, %u sources, parent irq %d; pending %#x, global en %#x, group en %#x, group ip %#x\n",
+			 ti->dest_grp, ti->nr_sources, irq > 0 ? irq : 0,
+			 pend, glb, gen, gip);
 	}
 
 	platform_set_drvdata(pdev, ti);
