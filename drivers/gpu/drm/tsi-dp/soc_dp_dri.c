@@ -37,26 +37,34 @@
 #include <linux/math64.h>
 #endif
 
-/* FPGA DEBUG */
+/*
+ * Link configurations in priority order. The vendor's FPGA platform
+ * only trains RBR x2 and below; silicon gets the full table the vendor
+ * had commented out (TSI, gap G15; CONFIG_SOC_DP_FPGA_LIMITS).
+ */
 static const struct soc_dp_link_config {
 	enum soc_dp_link_rate rate;
 	enum soc_dp_lane_count lanes;
 } soc_dp_link_priority_table[] = {
+#ifndef CONFIG_SOC_DP_FPGA_LIMITS
 	/* --- Tier 1: Ultra High Bandwidth (> 17 Gbps) --- */
-	// {SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_4}, /* 21.6 Gbps */
+	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_4}, /* 21.6 Gbps */
 
 	/* --- Tier 2: High Bandwidth (~10 Gbps) --- */
-	// {SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_4}, /* 10.8 Gbps */
-	// {SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_2}, /* 10.8 Gbps */
+	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_4}, /* 10.8 Gbps */
+	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_2}, /* 10.8 Gbps */
 
 	/* --- Tier 3: Medium Bandwidth (~5-6 Gbps) --- */
-	// {SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_4}, /* 6.48 Gbps */
-	// {SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_2}, /* 5.40 Gbps */
-	// {SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_1}, /* 5.40 Gbps */
+	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_4}, /* 6.48 Gbps */
+	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_2}, /* 5.40 Gbps */
+	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_1}, /* 5.40 Gbps */
+#endif
 
 	/* --- Tier 4: Low Bandwidth (< 4 Gbps) --- */
 	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_2}, /* 3.24 Gbps */
-	// {SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_1}, /* 2.70 Gbps */
+#ifndef CONFIG_SOC_DP_FPGA_LIMITS
+	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_1}, /* 2.70 Gbps */
+#endif
 	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_1}, /* 1.62 Gbps */
 };
 
@@ -862,10 +870,13 @@ static const struct drm_encoder_funcs soc_dp_encoder_funcs = {
 static enum drm_mode_status soc_dp_encoder_mode_valid(struct drm_encoder *crtc,
 		const struct drm_display_mode *mode)
 {
-	/* FPGA DEBUG */
-	// if (mode->hdisplay > 3840 || mode->vdisplay > 2160)
+#ifdef CONFIG_SOC_DP_FPGA_LIMITS
 	if (mode->hdisplay > 640 || mode->vdisplay > 480)
 		return MODE_BAD_HVALUE;
+#else
+	if (mode->hdisplay > 3840 || mode->vdisplay > 2160)
+		return MODE_BAD_HVALUE;
+#endif
 
 	return MODE_OK;
 }
@@ -886,8 +897,9 @@ int soc_dp_compute_color_spec(struct soc_dp_dev *dp,
 	uint32_t max_bw, req_bw, bpp;
 	uint32_t color_format, target_drm_format;
 
-	/* FPGA DEBUG */
+#ifdef CONFIG_SOC_DP_FPGA_LIMITS
 	info->bpc = 8;
+#endif
 
 	max_allowed_bpc = info->bpc ? info->bpc : 8;
 	if (conn_state->max_requested_bpc > 0)

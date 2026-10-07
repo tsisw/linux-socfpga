@@ -17,9 +17,12 @@
 #define SOC_DP_PLL_FRAC_MOD       16777216  /* 2^24 */
 #define SOC_DP_PLL_ERR_TOLERANCE  10
 
-/* FPGA DEBUG */
-// #define SOC_DPTX_STREAM_OFFSET    0x10000
+/* Per-stream register stride: none on the vendor's FPGA (G15). */
+#ifdef CONFIG_SOC_DP_FPGA_LIMITS
 #define SOC_DPTX_STREAM_OFFSET    0x0
+#else
+#define SOC_DPTX_STREAM_OFFSET    0x10000
+#endif
 #define SOC_DP_PHY_MAX_STREAMS    4
 
 #ifdef CONFIG_SOC_DP_ACTIVATE_DO_DIV

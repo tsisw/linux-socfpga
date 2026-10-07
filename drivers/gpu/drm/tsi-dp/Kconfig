@@ -93,4 +93,18 @@ config SOC_DP_HPD_BYPASS
 
 	  If unsure, say N.
 
+config SOC_DP_FPGA_LIMITS
+	bool "Keep the vendor's FPGA bring-up limits"
+	depends on DRM_SOC_DP
+	default n
+	help
+	  The driver ships tuned for the vendor's FPGA platform:
+	  the link-rate table stops at RBR x2 (3.24 Gbps), modes
+	  are capped at 640x480, the sink's bpc is forced to 8,
+	  and the PHY's per-stream register stride is zero.
+
+	  Say Y for an FPGA target (proFPGA). Say N for silicon,
+	  which lifts all four limits to the vendor's own
+	  commented-out values (gap G15).
+
 endmenu

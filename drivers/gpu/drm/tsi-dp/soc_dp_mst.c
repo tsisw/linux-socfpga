@@ -567,10 +567,13 @@ static const struct drm_dp_mst_topology_cbs soc_dp_mst_topology_cbs = {
 static enum drm_mode_status soc_dp_mst_encoder_mode_valid(struct drm_encoder *crtc,
 		const struct drm_display_mode *mode)
 {
-	/* FPGA DEBUG */
-	// if (mode->hdisplay > 3840 || mode->vdisplay > 2160)
+#ifdef CONFIG_SOC_DP_FPGA_LIMITS
 	if (mode->hdisplay > 640 || mode->vdisplay > 480)
 		return MODE_BAD_HVALUE;
+#else
+	if (mode->hdisplay > 3840 || mode->vdisplay > 2160)
+		return MODE_BAD_HVALUE;
+#endif
 
 	return MODE_OK;
 }
