@@ -1075,10 +1075,13 @@ static int soc_dp_phy_probe(struct platform_device *pdev)
 	if (!priv->regs)
 		return -ENOMEM;
 
-	if (device_property_read_u32(dev, "ref_clock", &priv->ref_clk_khz)) {
-		dev_err(dev, "ref_clock attribute not found, default to use 24M\n");
-		priv->ref_clk_khz = 24000;
-	}
+	/*
+	 * TSI: every PLL the solver computes is derived from this value, and
+	 * the vendor's 24 MHz fallback is wrong for SkyLP (50 MHz, HW-4).
+	 * A missing property is a firmware bug, not something to guess (G8).
+	 */
+	if (device_property_read_u32(dev, "ref_clock", &priv->ref_clk_khz))
+		return dev_err_probe(dev, -EINVAL, "ref_clock (kHz) not described\n");
 
 	phy = devm_phy_create(&pdev->dev, NULL, &soc_dp_phy_ops);
 	if (IS_ERR(phy)) {
