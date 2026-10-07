@@ -59,6 +59,14 @@ properties:
   interrupts:
     maxItems: 1
 
+  interrupts-extended:
+    maxItems: 1
+    description:
+      The usb_intr line usually sits behind the UDI interrupt
+      collector rather than directly on the GIC, so this encoding is
+      the common one (as in the example below). Exactly one of
+      "interrupts" or "interrupts-extended" must be present.
+
   clocks:
     description:
       Clocks feeding the UDI USB subsystem. The soc_drd controller
@@ -149,7 +157,10 @@ required:
   - compatible
   - reg
   - reg-names
-  - interrupts
+
+oneOf:
+  - required: [ interrupts ]
+  - required: [ interrupts-extended ]
 
 additionalProperties: false
 

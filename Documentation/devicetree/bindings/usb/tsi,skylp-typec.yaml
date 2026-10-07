@@ -87,6 +87,13 @@ required:
   - compatible
   - reg
 
+# The switch flags are only meaningful when a Type-C port manager is
+# graph-linked; without "port" the mux lookup can never find this
+# provider, so enforce what the property descriptions already say.
+dependencies:
+  mode-switch: [ port ]
+  orientation-switch: [ port ]
+
 additionalProperties: false
 
 examples:
