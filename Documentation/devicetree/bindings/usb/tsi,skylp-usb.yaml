@@ -108,9 +108,11 @@ properties:
         bit 0  refclk_sel       0 single-ended, 1 differential reference
         bit 1  refclk100m_sel   0 use 50 MHz FREF, 1 use FREF_100M
         bit 2  div2_clken       feed the controller ref_clk FREF / 2
-      With div2_clken set the driver programs the controller for a
-      25 MHz ref_clk (GUCTL.REFCLKPER, GCTL.PWRDNSCALE); otherwise for
-      the full 50 MHz FREF.
+      div2_clken RESETS TO 1 (udi_clk_sel reset {0, 0, 1}), so the
+      controller ref_clk is 25 MHz by default; the driver programs
+      GUCTL.REFCLKPER and GCTL.PWRDNSCALE for 25 MHz unless this
+      property explicitly clears div2_clken, in which case it programs
+      them for the full 50 MHz FREF.
 
   tsi,mux-mode:
     $ref: /schemas/types.yaml#/definitions/uint32

@@ -49,7 +49,7 @@
  */
 #define TSI_SKYLP_CLKSEL_REFCLK_SEL	BIT(0)	/* 0 single-ended, 1 differential */
 #define TSI_SKYLP_CLKSEL_REFCLK100M_SEL	BIT(1)	/* 0 50M FREF, 1 100M FREF_100M */
-#define TSI_SKYLP_CLKSEL_DIV2_CLKEN	BIT(2)	/* ref_clk = FREF / 2 */
+#define TSI_SKYLP_CLKSEL_DIV2_CLKEN	BIT(2)	/* ref_clk = FREF / 2; RESETS TO 1 */
 
 /*
  * gpp udi_reset_cfg (hardware team, 2026-10-07): active-low reset
@@ -145,7 +145,8 @@ int tsi_skylp_usb_refclk_seq(const struct tsi_skylp_hw *hw,
 void tsi_skylp_usb_reset_seq(const struct tsi_skylp_hw *hw);
 /*
  * The controller ref_clk rate the board's clksel choice produces:
- * FREF/2 when the sequence will set div2_clken, FREF otherwise.
+ * FREF/2 unless an applied clksel explicitly clears div2_clken, which
+ * resets to 1 (HW-4).
  */
 unsigned long tsi_skylp_usb_ref_clk_hz(const struct tsi_skylp_init *init);
 /*

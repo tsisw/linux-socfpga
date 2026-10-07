@@ -259,15 +259,17 @@ static void skylp_test_ref_clk_follows_div2(struct kunit *test)
 {
 	struct tsi_skylp_init init = {};
 
-	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
-	init.has_clksel = true;
-	init.clksel_val = 0x3;	/* refclk_sel | refclk100m_sel, no div2 */
-	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
-	init.clksel_val = 0x4;	/* div2_clken */
+	/* div2_clken RESETS TO 1 (HW-4): an untouched board divides */
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 25000000UL);
-	/* a clksel value the sequence will not write cannot divide */
-	init.has_clksel = false;
+	init.has_clksel = true;
+	init.clksel_val = 0x4;	/* div2_clken kept set */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 25000000UL);
+	/* only an explicit clksel write that CLEARS div2 gives 50 MHz */
+	init.clksel_val = 0x3;	/* refclk_sel | refclk100m_sel, div2 cleared */
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
+	init.has_clksel = false;
+	init.clksel_val = 0x3;	/* value without a window is never written */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 25000000UL);
 }
 
 /* 25 MHz: period 40 ns, scale 25 MHz / 16 kHz = 1562 */

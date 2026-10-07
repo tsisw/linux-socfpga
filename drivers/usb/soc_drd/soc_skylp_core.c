@@ -122,16 +122,17 @@ EXPORT_SYMBOL_GPL(tsi_skylp_usb_reset_seq);
 
 /*
  * What the controller's ref_clk pin will run at once the sequence has
- * applied the board's clksel choice: half the 50 MHz FREF when
- * div2_clken is among the bits to be written, the full FREF otherwise.
- * A clksel the sequence will not write (no window/property) leaves the
- * divider at its reset state, which does not divide.
+ * applied the board's clksel choice. div2_clken RESETS TO 1 (udi_clk_sel
+ * reset {0, 0, 1}, HW-4), so the divided 25 MHz is the default; only an
+ * explicit clksel write that clears the bit selects the full 50 MHz
+ * FREF. A clksel the sequence will not write (no window or property)
+ * leaves the divider at that reset state.
  */
 unsigned long tsi_skylp_usb_ref_clk_hz(const struct tsi_skylp_init *init)
 {
-	if (init->has_clksel && (init->clksel_val & TSI_SKYLP_CLKSEL_DIV2_CLKEN))
-		return TSI_SKYLP_USB_FREF_HZ / 2;
-	return TSI_SKYLP_USB_FREF_HZ;
+	if (init->has_clksel && !(init->clksel_val & TSI_SKYLP_CLKSEL_DIV2_CLKEN))
+		return TSI_SKYLP_USB_FREF_HZ;
+	return TSI_SKYLP_USB_FREF_HZ / 2;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_ref_clk_hz);
 
