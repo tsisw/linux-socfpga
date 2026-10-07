@@ -78,14 +78,18 @@ config SOC_DP_HOT_PLUG_THREAD_ENABLED
 config SOC_DP_HPD_BYPASS
 	bool "Bypass hardware HPD detection"
 	depends on DRM_SOC_DP
-	default n
+	default y if DRM_TSI_SKYLP
 	help
 	  Bypass real hardware HPD (Hot Plug Detect) status
 	  register reads. The connector status is determined
-	  solely by software state.
+	  solely by software state, and FORCE_HPD is asserted
+	  at init.
 
-	  This is typically used together with SOC_DP_DRIVER_QEMU
-	  in simulation environments.
+	  Used together with SOC_DP_DRIVER_QEMU in simulation,
+	  and on TSI SkyLP, where the controller's pin_hpd is
+	  tied low and no GPIO carries hot-plug (gap G19), so the
+	  driver must force HPD. Defaults on when the TSI SkyLP
+	  display driver is selected.
 
 	  If unsure, say N.
 
