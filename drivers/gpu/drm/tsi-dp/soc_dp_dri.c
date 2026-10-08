@@ -17,6 +17,8 @@
 #include <drm/drm_atomic_state_helper.h>
 #include <drm/drm_modeset_helper_vtables.h>
 #include <drm/drm_probe_helper.h>
+#include <kunit/visibility.h>
+
 #include <drm/drm_edid.h>
 #include <drm/drm_of.h>
 
@@ -42,10 +44,7 @@
  * only trains RBR x2 and below; silicon gets the full table the vendor
  * had commented out (TSI, gap G15; CONFIG_SOC_DP_FPGA_LIMITS).
  */
-static const struct soc_dp_link_config {
-	enum soc_dp_link_rate rate;
-	enum soc_dp_lane_count lanes;
-} soc_dp_link_priority_table[] = {
+VISIBLE_IF_KUNIT const struct soc_dp_link_config soc_dp_link_priority_table[] = {
 #ifndef CONFIG_SOC_DP_FPGA_LIMITS
 	/* --- Tier 1: Ultra High Bandwidth (> 17 Gbps) --- */
 	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_4}, /* 21.6 Gbps */
@@ -67,6 +66,10 @@ static const struct soc_dp_link_config {
 #endif
 	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_1}, /* 1.62 Gbps */
 };
+EXPORT_SYMBOL_IF_KUNIT(soc_dp_link_priority_table);
+VISIBLE_IF_KUNIT const unsigned int soc_dp_link_priority_table_len =
+	ARRAY_SIZE(soc_dp_link_priority_table);
+EXPORT_SYMBOL_IF_KUNIT(soc_dp_link_priority_table_len);
 
 static const struct soc_format_info {
 	uint8_t bpp; /* Bits Per Pixel */

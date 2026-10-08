@@ -18,6 +18,20 @@ config DRM_SOC_DP
 	  To compile this driver as a module, choose M here:
 	  the module will be called soc_dp_drm.
 
+config DRM_SOC_DP_KUNIT_TEST
+	tristate "KUnit tests for the DP link/format tables" if !KUNIT_ALL_TESTS
+	depends on DRM_SOC_DP && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Validates the data the DP driver trains links from: the
+	  link-priority table (ordering, uniqueness, PHY trainability,
+	  the G15 FPGA/silicon build split), the per-format bpp table,
+	  and the first-fit bandwidth selection contract. Runs under UML
+	  via tools/testing/kunit/kunit.py with this directory's
+	  .kunitconfig.
+
+	  Say N unless you are developing the driver.
+
 config DRM_SOC_DP_PHY
 	tristate "SOC DisplayPort PHY Driver"
 	depends on OF && COMMON_CLK

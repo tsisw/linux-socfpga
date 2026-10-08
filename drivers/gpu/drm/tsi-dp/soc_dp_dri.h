@@ -53,6 +53,21 @@ enum soc_dp_lane_count {
 	SOC_DP_LANE_4 = 4,
 };
 
+/*
+ * TSI: one entry of the link-training priority table (soc_dp_dri.c).
+ * The struct is named here so the KUnit table-invariant tests can see
+ * the entries; the table itself is only exposed in KUnit builds.
+ */
+struct soc_dp_link_config {
+	enum soc_dp_link_rate rate;
+	enum soc_dp_lane_count lanes;
+};
+
+#if IS_ENABLED(CONFIG_KUNIT)
+extern const struct soc_dp_link_config soc_dp_link_priority_table[];
+extern const unsigned int soc_dp_link_priority_table_len;
+#endif
+
 struct soc_dp_mst_encoder {
 	struct drm_encoder base;
 	struct soc_dp_dev *dp;
