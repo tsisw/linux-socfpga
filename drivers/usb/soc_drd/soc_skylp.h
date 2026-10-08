@@ -103,6 +103,7 @@ struct tsi_skylp_hw {
  * quoted.
  */
 #define TSI_SKYLP_USB_FREF_HZ		50000000UL
+#define TSI_SKYLP_USB_FREF100_HZ	100000000UL
 #define TSI_SKYLP_GCTL_PWRDNSCALE	GENMASK(31, 19)	/* ref_clk / 16 kHz */
 #define TSI_SKYLP_GUCTL_REFCLKPER	GENMASK(31, 22)	/* ref_clk period, ns */
 
@@ -144,9 +145,10 @@ int tsi_skylp_usb_refclk_seq(const struct tsi_skylp_hw *hw,
  */
 void tsi_skylp_usb_reset_seq(const struct tsi_skylp_hw *hw);
 /*
- * The controller ref_clk rate the board's clksel choice produces:
- * FREF/2 unless an applied clksel explicitly clears div2_clken, which
- * resets to 1 (HW-4).
+ * The controller ref_clk rate the board's clksel choice produces: the
+ * base is FREF, or FREF_100M when an applied clksel sets
+ * refclk100m_sel; div2_clken (which resets to 1, HW-4) then halves it.
+ * No applied clksel means the reset value {0, 0, 1}: 25 MHz.
  */
 unsigned long tsi_skylp_usb_ref_clk_hz(const struct tsi_skylp_init *init);
 /*

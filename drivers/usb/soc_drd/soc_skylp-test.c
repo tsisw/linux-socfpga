@@ -264,12 +264,36 @@ static void skylp_test_ref_clk_follows_div2(struct kunit *test)
 	init.has_clksel = true;
 	init.clksel_val = 0x4;	/* div2_clken kept set */
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 25000000UL);
-	/* only an explicit clksel write that CLEARS div2 gives 50 MHz */
-	init.clksel_val = 0x3;	/* refclk_sel | refclk100m_sel, div2 cleared */
+	/* an explicit clksel that CLEARS div2 gives the undivided base */
+	init.clksel_val = 0x1;	/* refclk_sel only, div2 cleared */
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
 	init.has_clksel = false;
-	init.clksel_val = 0x3;	/* value without a window is never written */
+	init.clksel_val = 0x1;	/* value without a window is never written */
 	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 25000000UL);
+}
+
+/* refclk100m_sel (bit 1) swaps the base to FREF_100M before div2 */
+static void skylp_test_ref_clk_follows_100m_base(struct kunit *test)
+{
+	struct tsi_skylp_init init = { .has_clksel = true };
+
+	init.clksel_val = 0x2;	/* 100 MHz base, div2 cleared */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 100000000UL);
+	init.clksel_val = 0x6;	/* 100 MHz base, halved */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
+	init.clksel_val = 0x7;	/* differential 100 MHz, halved */
+	KUNIT_EXPECT_EQ(test, tsi_skylp_usb_ref_clk_hz(&init), 50000000UL);
+}
+
+/* 100 MHz: period 10 ns, scale 100 MHz / 16 kHz = 6250 - both encodable */
+static void skylp_test_refclk_seq_programs_100mhz(struct kunit *test)
+{
+	struct op_log log = {};
+	struct tsi_skylp_hw hw = test_hw(&log);
+
+	KUNIT_ASSERT_EQ(test, tsi_skylp_usb_refclk_seq(&hw, 100000000UL), 0);
+	KUNIT_EXPECT_EQ(test, log.regs[TSI_SKYLP_REG_GUCTL], 10u << 22);
+	KUNIT_EXPECT_EQ(test, log.regs[TSI_SKYLP_REG_GCTL], 6250u << 19);
 }
 
 /* 25 MHz: period 40 ns, scale 25 MHz / 16 kHz = 1562 */
@@ -575,6 +599,8 @@ static struct kunit_case skylp_test_cases[] = {
 	KUNIT_CASE(skylp_test_reset_seq_noop_when_released),
 	KUNIT_CASE(skylp_test_reset_seq_skips_settle_when_por_out),
 	KUNIT_CASE(skylp_test_ref_clk_follows_div2),
+	KUNIT_CASE(skylp_test_ref_clk_follows_100m_base),
+	KUNIT_CASE(skylp_test_refclk_seq_programs_100mhz),
 	KUNIT_CASE(skylp_test_refclk_seq_programs_25mhz),
 	KUNIT_CASE(skylp_test_mux_update_writes_only_on_change),
 	KUNIT_CASE(skylp_test_typec_state_safe_is_no_connection),

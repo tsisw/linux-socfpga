@@ -130,9 +130,13 @@ EXPORT_SYMBOL_GPL(tsi_skylp_usb_reset_seq);
  */
 unsigned long tsi_skylp_usb_ref_clk_hz(const struct tsi_skylp_init *init)
 {
-	if (init->has_clksel && !(init->clksel_val & TSI_SKYLP_CLKSEL_DIV2_CLKEN))
-		return TSI_SKYLP_USB_FREF_HZ;
-	return TSI_SKYLP_USB_FREF_HZ / 2;
+	/* No applied clksel leaves the reset value {0, 0, 1}. */
+	u32 sel = init->has_clksel ? init->clksel_val :
+				     TSI_SKYLP_CLKSEL_DIV2_CLKEN;
+	unsigned long fref = (sel & TSI_SKYLP_CLKSEL_REFCLK100M_SEL) ?
+			     TSI_SKYLP_USB_FREF100_HZ : TSI_SKYLP_USB_FREF_HZ;
+
+	return (sel & TSI_SKYLP_CLKSEL_DIV2_CLKEN) ? fref / 2 : fref;
 }
 EXPORT_SYMBOL_GPL(tsi_skylp_usb_ref_clk_hz);
 
@@ -249,9 +253,11 @@ static void __iomem *tsi_skylp_map(struct platform_device *pdev,
 	if (!res && !pdev->dev.of_node)
 		res = platform_get_resource(pdev, IORESOURCE_MEM, index);
 	if (!res)
-		return NULL;
+		return NULL;	/* genuinely absent: optional windows skip */
 	dev_info(&pdev->dev, "%s window %pR\n", name, res);
-	return devm_ioremap(&pdev->dev, res->start, resource_size(res));
+	/* Declared but unmappable must fail, not degrade to "absent". */
+	return devm_ioremap(&pdev->dev, res->start, resource_size(res)) ?:
+	       ERR_PTR(-ENOMEM);
 }
 
 int tsi_skylp_usb_parse(const struct fwnode_handle *fw, struct tsi_skylp_init *init)
@@ -314,12 +320,19 @@ int tsi_skylp_usb_init(struct device *dev)
 	hw.ctx = io;
 
 	io->regs[TSI_SKYLP_REG_MUX] = tsi_skylp_map(pdev, "tsi-mux", 1);
+	if (IS_ERR(io->regs[TSI_SKYLP_REG_MUX]))
+		return dev_err_probe(dev, PTR_ERR(io->regs[TSI_SKYLP_REG_MUX]),
+				     "tsi-mux window map failed\n");
 	if (!io->regs[TSI_SKYLP_REG_MUX])
 		return dev_err_probe(dev, -EINVAL,
 				     "missing tsi-mux window (mux resets to no-connection)\n");
 
 	if (init.has_tsar) {
 		io->regs[TSI_SKYLP_REG_TSAR] = tsi_skylp_map(pdev, "tsi-tsar", 2);
+		if (IS_ERR(io->regs[TSI_SKYLP_REG_TSAR]))
+			return dev_err_probe(dev,
+					     PTR_ERR(io->regs[TSI_SKYLP_REG_TSAR]),
+					     "tsi-tsar window map failed\n");
 		if (!io->regs[TSI_SKYLP_REG_TSAR])
 			return dev_err_probe(dev, -EINVAL,
 					     "tsi,tsar-init without tsi-tsar window\n");
@@ -328,6 +341,10 @@ int tsi_skylp_usb_init(struct device *dev)
 	if (init.has_clksel) {
 		io->regs[TSI_SKYLP_REG_CLKSEL] = tsi_skylp_map(pdev,
 							       "tsi-clksel", 3);
+		if (IS_ERR(io->regs[TSI_SKYLP_REG_CLKSEL]))
+			return dev_err_probe(dev,
+					     PTR_ERR(io->regs[TSI_SKYLP_REG_CLKSEL]),
+					     "tsi-clksel window map failed\n");
 		if (!io->regs[TSI_SKYLP_REG_CLKSEL])
 			return dev_err_probe(dev, -EINVAL,
 					     "tsi,clksel-init without tsi-clksel window\n");
@@ -339,6 +356,9 @@ int tsi_skylp_usb_init(struct device *dev)
 	 * that leaves it out had firmware do it.
 	 */
 	io->regs[TSI_SKYLP_REG_RESET] = tsi_skylp_map(pdev, "tsi-reset", 4);
+	if (IS_ERR(io->regs[TSI_SKYLP_REG_RESET]))
+		return dev_err_probe(dev, PTR_ERR(io->regs[TSI_SKYLP_REG_RESET]),
+				     "tsi-reset window declared but unmappable: USB may be held in reset\n");
 	init.has_reset = io->regs[TSI_SKYLP_REG_RESET] != NULL;
 	if (!init.has_reset)
 		dev_info(dev, "no tsi-reset window: UDI resets assumed released\n");
