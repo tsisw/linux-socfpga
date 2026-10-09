@@ -208,6 +208,3 @@ static struct kunit_suite soc_dp_dri_suite = {
 	.test_cases = soc_dp_dri_cases,
 };
 kunit_test_suite(soc_dp_dri_suite);
-
-MODULE_DESCRIPTION("KUnit tests for the DP link/format tables");
-MODULE_LICENSE("GPL");

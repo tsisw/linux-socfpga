@@ -66,10 +66,8 @@ VISIBLE_IF_KUNIT const struct soc_dp_link_config soc_dp_link_priority_table[] = 
 #endif
 	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_1}, /* 1.62 Gbps */
 };
-EXPORT_SYMBOL_IF_KUNIT(soc_dp_link_priority_table);
 VISIBLE_IF_KUNIT const unsigned int soc_dp_link_priority_table_len =
 	ARRAY_SIZE(soc_dp_link_priority_table);
-EXPORT_SYMBOL_IF_KUNIT(soc_dp_link_priority_table_len);
 
 static const struct soc_format_info {
 	uint8_t bpp; /* Bits Per Pixel */
