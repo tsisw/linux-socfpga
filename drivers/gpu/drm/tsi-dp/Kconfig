@@ -1,0 +1,124 @@
+menu "SOC DisplayPort (DP) Drivers"
+
+config DRM_SOC_DP
+	tristate "SOC DisplayPort Driver"
+	depends on DRM && OF
+	select DRM_DISPLAY_DP_HELPER
+	select DRM_DISPLAY_HELPER
+	select DRM_KMS_HELPER
+	default n
+	help
+	  DRM/KMS driver for the SOC DisplayPort controller.
+	  Supports SST (Single-Stream Transport) and MST
+	  (Multi-Stream Transport) modes.
+
+	  This driver provides the main DP encoder, connector,
+	  AUX channel, and MST topology management.
+
+	  To compile this driver as a module, choose M here:
+	  the module will be called soc_dp_drm.
+
+config DRM_SOC_DP_KUNIT_TEST
+	tristate "KUnit tests for the DP link/format tables" if !KUNIT_ALL_TESTS
+	depends on DRM_SOC_DP && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Validates the data the DP driver trains links from: the
+	  link-priority table (ordering, uniqueness, PHY trainability,
+	  the G15 FPGA/silicon build split), the per-format bpp table,
+	  and the first-fit bandwidth selection contract. Runs under UML
+	  via tools/testing/kunit/kunit.py with this directory's
+	  .kunitconfig.
+
+	  Say N unless you are developing the driver.
+
+config DRM_SOC_DP_PHY
+	tristate "SOC DisplayPort PHY Driver"
+	depends on OF && COMMON_CLK
+	select GENERIC_PHY
+	default n
+	help
+	  PHY driver for the SOC DisplayPort controller.
+	  Handles PLL configuration, lane rate setup, and
+	  pixel clock generation.
+
+	  To compile this driver as a module, choose M here:
+	  the module will be called soc_dp_phy.
+
+config SOC_DP_DRIVER_QEMU
+	bool "SOC DP QEMU / virtual simulation mode"
+	depends on DRM_SOC_DP
+	default n
+	help
+	  Enable QEMU / software simulation mode. When enabled,
+	  AUX transfers are routed to the virtual RX receiver
+	  instead of real hardware registers. Hardware AUX
+	  functions are excluded from compilation.
+
+	  This is intended for development and testing in a
+	  virtualized environment without real DP hardware.
+
+	  If unsure, say N.
+
+config SOC_DP_ACTIVATE_DO_DIV
+	bool "Use do_div() for 64-bit division"
+	depends on DRM_SOC_DP
+	default n
+	help
+	  Use the kernel's do_div() helper for 64-bit division
+	  operations. Required on 32-bit ARM platforms that lack
+	  native 64-bit hardware division support.
+
+	  Enabling this option includes <linux/math64.h> and
+	  routes all 64-bit divisions through do_div().
+
+	  If unsure, say N on 64-bit platforms, say Y on 32-bit
+	  ARM platforms.
+
+config SOC_DP_HOT_PLUG_THREAD_ENABLED
+	bool "Use polling thread for HPD detection"
+	depends on DRM_SOC_DP
+	default y
+	help
+	  Use a delayed work polling thread for Hot Plug Detect
+	  instead of a hardware interrupt line.
+
+	  Enable this when the hardware does not provide a
+	  dedicated HPD interrupt, or when using a polling-based
+	  approach is preferred for reliability.
+
+	  If unsure, say N (use hardware IRQ).
+
+config SOC_DP_HPD_BYPASS
+	bool "Bypass hardware HPD detection"
+	depends on DRM_SOC_DP
+	default y if DRM_TSI_SKYLP
+	help
+	  Bypass real hardware HPD (Hot Plug Detect) status
+	  register reads. The connector status is determined
+	  solely by software state, and FORCE_HPD is asserted
+	  at init.
+
+	  Used together with SOC_DP_DRIVER_QEMU in simulation,
+	  and on TSI SkyLP, where the controller's pin_hpd is
+	  tied low and no GPIO carries hot-plug (gap G19), so the
+	  driver must force HPD. Defaults on when the TSI SkyLP
+	  display driver is selected.
+
+	  If unsure, say N.
+
+config SOC_DP_FPGA_LIMITS
+	bool "Keep the vendor's FPGA bring-up limits"
+	depends on DRM_SOC_DP
+	default n
+	help
+	  The driver ships tuned for the vendor's FPGA platform:
+	  the link-rate table stops at RBR x2 (3.24 Gbps), modes
+	  are capped at 640x480, the sink's bpc is forced to 8,
+	  and the PHY's per-stream register stride is zero.
+
+	  Say Y for an FPGA target (proFPGA). Say N for silicon,
+	  which lifts all four limits to the vendor's own
+	  commented-out values (gap G15).
+
+endmenu

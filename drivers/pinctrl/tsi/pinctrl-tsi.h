@@ -153,8 +153,11 @@ int tsi_pinctrl_gpio_enable(struct tsi_pinctrl *tp, unsigned int pin);
 void tsi_pinctrl_irq_mask_hw(struct tsi_pinctrl *tp, unsigned int hwirq);
 void tsi_pinctrl_irq_unmask_hw(struct tsi_pinctrl *tp, unsigned int hwirq);
 void tsi_pinctrl_irq_ack_hw(struct tsi_pinctrl *tp, unsigned int hwirq);
-/* d is unused; safe to call with NULL from tests. */
-int tsi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
+/*
+ * Trigger-type validation only (level-only hardware); the irq_chip
+ * callback wraps this and additionally installs the flow handler.
+ */
+int tsi_pinctrl_irq_type_valid(unsigned int type);
 #endif
 
 #endif /* __PINCTRL_TSI_H */

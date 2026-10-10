@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config DRM_TSI_SKYLP
+	tristate "TSI SkyLP display controller (video bridge scanout)"
+	depends on DRM && OF && COMMON_CLK
+	depends on ARM64 || COMPILE_TEST
+	select DRM_KMS_HELPER
+	select DRM_GEM_DMA_HELPER
+	select DRM_TSI_SKYLP_VB
+	help
+	  DRM master, CRTC and primary plane for the video bridge in the
+	  Innosilicon UDI subsystem of TSI SkyLP. The bridge scans a
+	  physically contiguous framebuffer out to the DP controller, whose
+	  encoder and connector are provided by the soc,dp component driver
+	  (DRM_SOC_DP). This driver is the component master that binds it.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called tsi_skylp_drv.
+
+config DRM_TSI_SKYLP_VB
+	tristate "TSI SkyLP video bridge register core" if KUNIT
+	depends on DRM
+	help
+	  Register encoding and programming sequences for the SkyLP video
+	  bridge: mode-to-timing conversion, framebuffer address and format
+	  programming, channel start and stop, and interrupt acknowledge.
+	  They are kept free of DRM object state so they can be unit tested
+	  on their own. Selected by DRM_TSI_SKYLP; the prompt only appears
+	  in KUnit builds.
+
+config DRM_TSI_SKYLP_KUNIT_TEST
+	tristate "KUnit tests for the TSI SkyLP video bridge core" if !KUNIT_ALL_TESTS
+	depends on DRM_TSI_SKYLP_VB && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Unit tests for the video bridge programming core. They cover mode
+	  to timing conversion and its field limits, the accepted pixel
+	  formats, the 40-bit and 4 GiB scanout address rules, page-flip
+	  slot alternation and write order, and the interrupt acknowledge
+	  sequence. They run against a fake register file.
+
+	  If unsure, say N.

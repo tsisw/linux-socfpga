@@ -84,6 +84,14 @@ properties:
     minItems: 2
     maxItems: 26
 
+  gpio-reserved-ranges:
+    description: |
+      <first-line count> pairs of GPIO lines that Linux must not touch.
+      This is the mechanism for the M85 pad-ownership split: lines owned
+      by the management core are reserved here, and gpiolib refuses to
+      hand them out - no driver code involved. Line numbers are the
+      data-register bits described above.
+
   interrupts:
     maxItems: 1
     description:
@@ -195,6 +203,18 @@ patternProperties:
       input-schmitt-enable: true
       input-enable: true
       output-enable: true
+
+      output-high:
+        description: |
+          Drive the pads high at configuration time (the level is
+          latched in data_out before OE rises, so the pad never
+          glitches through a stale level). With a hog node this gives
+          a line a defined state at probe, before any consumer runs -
+          e.g. holding a PERST line deasserted.
+        type: boolean
+
+      output-low:
+        type: boolean
 
     additionalProperties: false
 

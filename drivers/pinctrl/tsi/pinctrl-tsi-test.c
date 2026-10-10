@@ -984,24 +984,24 @@ static void tsi_gpio_only_collectors_do_not_shift(struct kunit *test)
 static void tsi_irq_set_type_accepts_level(struct kunit *test)
 {
 	KUNIT_EXPECT_EQ(test,
-			tsi_pinctrl_irq_set_type(NULL, IRQ_TYPE_LEVEL_HIGH), 0);
+			tsi_pinctrl_irq_type_valid(IRQ_TYPE_LEVEL_HIGH), 0);
 	KUNIT_EXPECT_EQ(test,
-			tsi_pinctrl_irq_set_type(NULL, IRQ_TYPE_LEVEL_LOW), 0);
+			tsi_pinctrl_irq_type_valid(IRQ_TYPE_LEVEL_LOW), 0);
 }
 
 static void tsi_irq_set_type_rejects_edge_and_mixed(struct kunit *test)
 {
 	KUNIT_EXPECT_EQ(test,
-			tsi_pinctrl_irq_set_type(NULL, IRQ_TYPE_EDGE_RISING),
+			tsi_pinctrl_irq_type_valid(IRQ_TYPE_EDGE_RISING),
 			-EINVAL);
 	KUNIT_EXPECT_EQ(test,
-			tsi_pinctrl_irq_set_type(NULL, IRQ_TYPE_EDGE_BOTH),
+			tsi_pinctrl_irq_type_valid(IRQ_TYPE_EDGE_BOTH),
 			-EINVAL);
-	KUNIT_EXPECT_EQ(test, tsi_pinctrl_irq_set_type(NULL, IRQ_TYPE_NONE),
+	KUNIT_EXPECT_EQ(test, tsi_pinctrl_irq_type_valid(IRQ_TYPE_NONE),
 			-EINVAL);
 	/* Mixed edge+level: has a level bit set, but is still invalid. */
 	KUNIT_EXPECT_EQ(test,
-			tsi_pinctrl_irq_set_type(NULL, IRQ_TYPE_LEVEL_HIGH |
+			tsi_pinctrl_irq_type_valid(IRQ_TYPE_LEVEL_HIGH |
 						 IRQ_TYPE_EDGE_RISING),
 			-EINVAL);
 }
@@ -1245,6 +1245,54 @@ static void tsi_pinconf_direction_params(struct kunit *test)
 			pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 0)), 0);
 	KUNIT_EXPECT_EQ(test, fake_get(f, ctrl) & (CTRL_OE | CTRL_IE),
 			(u32)CTRL_IE);
+}
+
+/*
+ * PIN_CONFIG_OUTPUT is what a DT hog's output-high/output-low becomes:
+ * drive the pad to a defined level at configuration time. Same
+ * no-stale-drive rule as direction_output(): the level must reach
+ * data_out BEFORE OE rises, and only the pad's own bit may move.
+ */
+static void tsi_pinconf_output_drives_level(struct kunit *test)
+{
+	struct fake_regs *f;
+	/* start receiving, so OUTPUT must actively clear IE too */
+	struct tsi_pinctrl *tp = fake_corner(test, &f, IONW_BASE,
+					     &tsi_skylp_ionw_soc, CTRL_IE);
+	struct gpio_chip *gc = &tp->chip;
+	u32 ctrl = IONW_BASE + 0x11c;	/* GPIO_0 */
+	u32 arg = 0;
+
+	/* neighbour bits preloaded: the data_out write must be an RMW */
+	fake_set(f, IONW_DATA_OUT, BIT(5) | BIT(24));
+
+	f->nwrites = 0;
+	KUNIT_ASSERT_EQ(test, gc->set_config(gc, 0,
+			pinconf_to_config_packed(PIN_CONFIG_OUTPUT, 1)), 0);
+	KUNIT_ASSERT_EQ(test, f->nwrites, 2u);
+	/* order: level first, OE second */
+	KUNIT_EXPECT_EQ(test, f->log[0].off, (u32)IONW_DATA_OUT);
+	KUNIT_EXPECT_EQ(test, f->log[1].off, ctrl);
+	KUNIT_EXPECT_EQ(test, fake_get(f, IONW_DATA_OUT),
+			BIT(0) | BIT(5) | BIT(24));
+	KUNIT_EXPECT_EQ(test, fake_get(f, ctrl) & (CTRL_OE | CTRL_IE),
+			(u32)CTRL_OE);
+
+	/* output-low: clears only this pad's bit, pad keeps driving */
+	KUNIT_ASSERT_EQ(test, gc->set_config(gc, 0,
+			pinconf_to_config_packed(PIN_CONFIG_OUTPUT, 0)), 0);
+	KUNIT_EXPECT_EQ(test, fake_get(f, IONW_DATA_OUT), BIT(5) | BIT(24));
+	KUNIT_EXPECT_EQ(test, fake_get(f, ctrl) & (CTRL_OE | CTRL_IE),
+			(u32)CTRL_OE);
+
+	/* readback reports the driven level... */
+	KUNIT_EXPECT_EQ(test, pinconf_query(tp, 0, PIN_CONFIG_OUTPUT, &arg), 0);
+	KUNIT_EXPECT_EQ(test, arg, 0u);
+
+	/* ...and is a query: a non-driving pad has no output level */
+	KUNIT_ASSERT_EQ(test, gc->direction_input(gc, 0), 0);
+	KUNIT_EXPECT_EQ(test, pinconf_query(tp, 0, PIN_CONFIG_OUTPUT, NULL),
+			-EINVAL);
 }
 
 /* An unsupported parameter must be refused, not quietly dropped. */
@@ -1773,6 +1821,7 @@ static struct kunit_case tsi_pinctrl_test_cases[] = {
 	KUNIT_CASE(tsi_pinconf_get_drive_and_schmitt),
 	KUNIT_CASE(tsi_pinconf_get_rejects_reserved_ds),
 	KUNIT_CASE(tsi_pinconf_direction_params),
+	KUNIT_CASE(tsi_pinconf_output_drives_level),
 	KUNIT_CASE(tsi_pinconf_rejects_unsupported_param),
 	KUNIT_CASE(tsi_pinconf_group_set_touches_every_pad),
 	/* exhaustive per-pin sweeps */
