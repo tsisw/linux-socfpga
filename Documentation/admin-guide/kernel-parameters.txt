@@ -2414,6 +2414,14 @@
 			to let secondary kernels in charge of setting up
 			LPIs.
 
+	irqchip.gicv3_asr8601=
+			[ARM,ARM64,EARLY]
+			Treat every GICv3 redistributor's GICR_TYPER affinity
+			as the CPU's MPIDR shifted down one level (Aff1 to
+			Aff0, Aff2 to Aff1), the ASR8601 workaround that DT
+			selects with "asr,asr8601-gic-v3". For ACPI systems
+			whose GIC is integrated that way.
+
 	irqchip.gicv3_pseudo_nmi= [ARM64,EARLY]
 			Enables support for pseudo-NMIs in the kernel. This
 			requires the kernel to be built with

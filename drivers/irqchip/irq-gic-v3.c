@@ -1313,6 +1313,27 @@ static int __init gicv3_nolpi_cfg(char *buf)
 }
 early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
 
+/*
+ * Some integrations report each redistributor's GICR_TYPER.Affinity one level
+ * below the CPU's MPIDR_EL1 (the CPU's Aff1 in Aff0, its Aff2 in Aff1). That
+ * is the ASR8601 behaviour, which DT selects with "asr,asr8601-gic-v3"; ACPI
+ * has no way to describe it and only applies GICD_IIDR-matched quirks. This
+ * parameter applies the same workaround on either firmware interface.
+ *
+ * Needed on the TSI SkyLP proFPGA build: the GIC-700 is configured with
+ * cluster in Aff1 and core in Aff0 (redistributor IDs 0x0, 0x1, 0x100, 0x101)
+ * while its multi-threaded Cortex-A520s report core in Aff1 and cluster in
+ * Aff2 (0x0, 0x100, 0x10000, 0x10100). Without it each secondary CPU binds to
+ * another CPU's redistributor. Jira CC-1679.
+ */
+static bool gicv3_asr8601 __initdata;
+
+static int __init gicv3_asr8601_cfg(char *buf)
+{
+	return kstrtobool(buf, &gicv3_asr8601);
+}
+early_param("irqchip.gicv3_asr8601", gicv3_asr8601_cfg);
+
 static int gic_dist_supports_lpis(void)
 {
 	return (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) &&
@@ -2084,6 +2105,11 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 
 	gic_enable_quirks(readl_relaxed(gic_data.dist_base + GICD_IIDR),
 			  gic_quirks, &gic_data);
+
+	if (gicv3_asr8601) {
+		gic_data.flags |= FLAGS_WORKAROUND_ASR_ERRATUM_8601001;
+		pr_info("GIC: enabling workaround for ASR erratum 8601001 (irqchip.gicv3_asr8601)\n");
+	}
 
 	pr_info("%d SPIs implemented\n", GIC_LINE_NR - 32);
 	pr_info("%d Extended SPIs implemented\n", GIC_ESPI_NR);
